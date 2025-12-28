@@ -65,6 +65,10 @@ resource "aws_ecs_task_definition" "service1" {
         {
           name  = "AWS_REGION"
           value = var.aws_region
+        },
+        {
+          name  = "IMAGE_TAG"
+          value = data.aws_ssm_parameter.image_tag.value
         }
       ]
 

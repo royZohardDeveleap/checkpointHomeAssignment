@@ -15,6 +15,27 @@ on:
       - 'tasks/service1/**'
       - 'tasks/service2/**'
 
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to build/test (comma-separated: service1,service2 or "all")'
+        required: true
+        type: choice
+        options:
+          - all
+          - service1
+          - service2
+          - service1,service2
+      run_tests:
+        description: 'Run tests before build'
+        required: false
+        type: boolean
+        default: true
+      trigger_cd:
+        description: 'Trigger CD pipeline after build'
+        required: false
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-east-1
@@ -39,6 +60,7 @@ jobs:
       - name: Check for service changes
         uses: dorny/paths-filter@v3
         id: filter
+        if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
             service1:
@@ -51,16 +73,29 @@ jobs:
         run: |
           services="[]"
 
-          if [ "${{ steps.filter.outputs.service1 }}" == "true" ]; then
-            services=$(echo "$services" | jq -c '. += ["service1"]')
-          fi
+          # Handle manual dispatch
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            input_services="${{ github.event.inputs.services }}"
 
-          if [ "${{ steps.filter.outputs.service2 }}" == "true" ]; then
-            services=$(echo "$services" | jq -c '. += ["service2"]')
+            if [ "$input_services" == "all" ]; then
+              services='["service1","service2"]'
+            else
+              # Convert comma-separated string to JSON array
+              services=$(echo "$input_services" | jq -R 'split(",") | map(select(length > 0))')
+            fi
+          else
+            # Handle automatic triggers (push/PR)
+            if [ "${{ steps.filter.outputs.service1 }}" == "true" ]; then
+              services=$(echo "$services" | jq -c '. += ["service1"]')
+            fi
+
+            if [ "${{ steps.filter.outputs.service2 }}" == "true" ]; then
+              services=$(echo "$services" | jq -c '. += ["service2"]')
+            fi
           fi
 
           echo "services=$services" >> $GITHUB_OUTPUT
-          echo "Services to build: $services"
+          echo "Services to process: $services"
 
   # ============================================================================
   # TEST SERVICES (MATRIX) - Only on Pull Requests
@@ -70,8 +105,9 @@ jobs:
     name: Test ${{ matrix.service }}
     needs: detect-changes
     if: |
-      github.event_name == 'pull_request' &&
-      needs.detect-changes.outputs.services != '[]'
+      needs.detect-changes.outputs.services != '[]' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.run_tests == 'true'))
     uses: ./.github/workflows/test-service.yaml
 
     strategy:
@@ -88,11 +124,13 @@ jobs:
 
   build:
     name: Build ${{ matrix.service }}
-    needs: detect-changes
+    needs: [detect-changes, test]
     if: |
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.detect-changes.outputs.services != '[]'
+      always() &&
+      needs.detect-changes.outputs.services != '[]' &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+       github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/build-service.yaml
 
     permissions:
@@ -116,9 +154,9 @@ jobs:
     needs: [detect-changes, build]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' &&
-      github.event_name == 'push' &&
-      needs.build.result == 'success'
+      needs.build.result == 'success' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.trigger_cd == 'true'))
     runs-on: ubuntu-latest
 
     permissions:
