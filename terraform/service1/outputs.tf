@@ -26,4 +26,5 @@ output "service_id" {
 output "image_tag" {
   description = "Current image tag deployed"
   value       = data.aws_ssm_parameter.image_tag.value
+  sensitive   = true
 }
