@@ -1,0 +1,53 @@
+# Infrastructure Workspace Variables
+# Copy this file to terraform.tfvars and customize as needed
+
+# =============================================================================
+# PROJECT CONFIGURATION
+# =============================================================================
+
+project_name = "checkpoint-home-assignment-royzohar"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# =============================================================================
+# NETWORKING
+# =============================================================================
+
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# =============================================================================
+# FEATURE FLAGS
+# =============================================================================
+
+# Enable VPC endpoints (recommended to save ~$65/month vs NAT Gateway)
+enable_vpc_endpoints = true
+
+# Enable Grafana monitoring service
+# This creates the Grafana ECR repository and ALB target group
+enable_monitoring = false
+
+# Enable ECS Container Insights
+# Provides detailed metrics but incurs additional CloudWatch costs (~$5-15/month)
+enable_container_insights = false
+
+# =============================================================================
+# ECS CLUSTER CONFIGURATION
+# =============================================================================
+
+ecs_instance_type    = "t2.micro"  # Free tier eligible
+ecs_desired_capacity = 1
+ecs_min_size         = 1
+ecs_max_size         = 2
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# SQS queue visibility timeout (seconds)
+# Should be 6x the longest expected task processing time
+sqs_visibility_timeout = 30
+
+# SQS message retention (seconds)
+# Default: 345600 (4 days)
+sqs_message_retention = 345600
