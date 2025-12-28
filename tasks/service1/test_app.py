@@ -18,10 +18,10 @@ def valid_payload():
     return {
         'token': 'test-token-123',
         'data': {
-            'email': 'test@example.com',
-            'subject': 'Test Subject',
-            'body': 'Test email body content',
-            'timestamp': '2025-01-15T10:30:00Z'
+            'email_subject': 'Happy new year!',
+            'email_sender': 'John Doe',
+            'email_timestream': '1735392000',
+            'email_content': 'Just want to say... Happy new year!!!'
         }
     }
 
@@ -29,8 +29,10 @@ def valid_payload():
 class TestValidatePayload:
     """Test cases for validate_payload function."""
 
-    def test_valid_payload(self, valid_payload):
+    @patch('app.get_auth_token')
+    def test_valid_payload(self, mock_get_token, valid_payload):
         """Test validation with a valid payload."""
+        mock_get_token.return_value = 'test-token-123'
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is True
         assert error_message is None
@@ -40,55 +42,75 @@ class TestValidatePayload:
         del valid_payload['token']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field: token'
+        assert error_message == "Missing 'token' field"
 
     def test_missing_data(self, valid_payload):
         """Test validation when data field is missing."""
         del valid_payload['data']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field: data'
+        assert error_message == "Missing 'data' field"
 
-    def test_missing_email(self, valid_payload):
-        """Test validation when email is missing from data."""
-        del valid_payload['data']['email']
+    @patch('app.get_auth_token')
+    def test_missing_email_subject(self, mock_get_token, valid_payload):
+        """Test validation when email_subject is missing from data."""
+        mock_get_token.return_value = 'test-token-123'
+        del valid_payload['data']['email_subject']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field in data: email'
+        assert 'email_subject' in error_message
 
-    def test_missing_subject(self, valid_payload):
-        """Test validation when subject is missing from data."""
-        del valid_payload['data']['subject']
+    @patch('app.get_auth_token')
+    def test_missing_email_sender(self, mock_get_token, valid_payload):
+        """Test validation when email_sender is missing from data."""
+        mock_get_token.return_value = 'test-token-123'
+        del valid_payload['data']['email_sender']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field in data: subject'
+        assert 'email_sender' in error_message
 
-    def test_missing_body(self, valid_payload):
-        """Test validation when body is missing from data."""
-        del valid_payload['data']['body']
+    @patch('app.get_auth_token')
+    def test_missing_email_timestream(self, mock_get_token, valid_payload):
+        """Test validation when email_timestream is missing from data."""
+        mock_get_token.return_value = 'test-token-123'
+        del valid_payload['data']['email_timestream']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field in data: body'
+        assert 'email_timestream' in error_message
 
-    def test_missing_timestamp(self, valid_payload):
-        """Test validation when timestamp is missing from data."""
-        del valid_payload['data']['timestamp']
+    @patch('app.get_auth_token')
+    def test_missing_email_content(self, mock_get_token, valid_payload):
+        """Test validation when email_content is missing from data."""
+        mock_get_token.return_value = 'test-token-123'
+        del valid_payload['data']['email_content']
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field in data: timestamp'
+        assert 'email_content' in error_message
 
-    def test_data_not_dict(self, valid_payload):
-        """Test validation when data is not a dictionary."""
-        valid_payload['data'] = 'not a dict'
+    @patch('app.get_auth_token')
+    def test_empty_field(self, mock_get_token, valid_payload):
+        """Test validation when a field is empty."""
+        mock_get_token.return_value = 'test-token-123'
+        valid_payload['data']['email_subject'] = ''
         is_valid, error_message = validate_payload(valid_payload)
         assert is_valid is False
-        assert error_message == 'Missing required field: data'
+        assert 'Empty values' in error_message
+
+    @patch('app.get_auth_token')
+    def test_invalid_token(self, mock_get_token, valid_payload):
+        """Test validation with invalid token."""
+        mock_get_token.return_value = 'correct-token'
+        valid_payload['token'] = 'wrong-token'
+        is_valid, error_message = validate_payload(valid_payload)
+        assert is_valid is False
+        assert error_message == 'Invalid token'
 
 
 class TestPublishToSQS:
     """Test cases for publish_to_sqs function."""
 
     @patch('app.sqs_client')
+    @patch.dict('os.environ', {'SQS_QUEUE_URL': 'https://sqs.us-east-1.amazonaws.com/123456789012/test-queue'})
     def test_successful_publish(self, mock_sqs_client, valid_payload):
         """Test successful message publishing to SQS."""
         mock_sqs_client.send_message.return_value = {
@@ -101,13 +123,18 @@ class TestPublishToSQS:
         assert result is True
         mock_sqs_client.send_message.assert_called_once()
         call_args = mock_sqs_client.send_message.call_args
-        assert call_args[1]['QueueUrl'] is not None
+        assert call_args[1]['QueueUrl'] == 'https://sqs.us-east-1.amazonaws.com/123456789012/test-queue'
         assert json.loads(call_args[1]['MessageBody']) == valid_payload['data']
 
     @patch('app.sqs_client')
+    @patch.dict('os.environ', {'SQS_QUEUE_URL': 'https://sqs.us-east-1.amazonaws.com/123456789012/test-queue'})
     def test_publish_failure(self, mock_sqs_client, valid_payload):
         """Test handling of SQS publish failure."""
-        mock_sqs_client.send_message.side_effect = Exception('SQS Error')
+        from botocore.exceptions import ClientError
+        mock_sqs_client.send_message.side_effect = ClientError(
+            {'Error': {'Code': 'ServiceUnavailable', 'Message': 'Service unavailable'}},
+            'SendMessage'
+        )
 
         result = publish_to_sqs(valid_payload['data'])
 
@@ -124,19 +151,30 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['status'] == 'healthy'
+
+
+class TestRootEndpoint:
+    """Test cases for / endpoint."""
+
+    def test_root_endpoint(self, client):
+        """Test the root endpoint."""
+        response = client.get('/')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
         assert data['service'] == 'service1'
+        assert 'version' in data
+        assert 'endpoints' in data
 
 
 class TestProcessEndpoint:
     """Test cases for /process endpoint."""
 
-    @patch('app.ssm_client')
+    @patch('app.get_auth_token')
     @patch('app.publish_to_sqs')
-    def test_successful_process(self, mock_publish, mock_ssm_client, client, valid_payload):
+    def test_successful_process(self, mock_publish, mock_get_token, client, valid_payload):
         """Test successful request processing."""
-        mock_ssm_client.get_parameter.return_value = {
-            'Parameter': {'Value': 'test-token-123'}
-        }
+        mock_get_token.return_value = 'test-token-123'
         mock_publish.return_value = True
 
         response = client.post('/process',
@@ -146,21 +184,19 @@ class TestProcessEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['status'] == 'success'
-        assert 'message_id' in data
+        assert 'message' in data
 
-    @patch('app.ssm_client')
-    def test_invalid_token(self, mock_ssm_client, client, valid_payload):
+    @patch('app.get_auth_token')
+    def test_invalid_token(self, mock_get_token, client, valid_payload):
         """Test request with invalid token."""
-        mock_ssm_client.get_parameter.return_value = {
-            'Parameter': {'Value': 'correct-token'}
-        }
+        mock_get_token.return_value = 'correct-token'
         valid_payload['token'] = 'wrong-token'
 
         response = client.post('/process',
                               data=json.dumps(valid_payload),
                               content_type='application/json')
 
-        assert response.status_code == 401
+        assert response.status_code == 400
         data = json.loads(response.data)
         assert data['error'] == 'Invalid token'
 
@@ -174,13 +210,11 @@ class TestProcessEndpoint:
         data = json.loads(response.data)
         assert data['error'] == 'Invalid JSON payload'
 
-    @patch('app.ssm_client')
-    def test_missing_required_field(self, mock_ssm_client, client, valid_payload):
+    @patch('app.get_auth_token')
+    def test_missing_required_field(self, mock_get_token, client, valid_payload):
         """Test request with missing required field."""
-        mock_ssm_client.get_parameter.return_value = {
-            'Parameter': {'Value': 'test-token-123'}
-        }
-        del valid_payload['data']['email']
+        mock_get_token.return_value = 'test-token-123'
+        del valid_payload['data']['email_subject']
 
         response = client.post('/process',
                               data=json.dumps(valid_payload),
@@ -188,15 +222,13 @@ class TestProcessEndpoint:
 
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'Missing required field' in data['error']
+        assert 'Missing required fields' in data['error']
 
-    @patch('app.ssm_client')
+    @patch('app.get_auth_token')
     @patch('app.publish_to_sqs')
-    def test_sqs_publish_failure(self, mock_publish, mock_ssm_client, client, valid_payload):
+    def test_sqs_publish_failure(self, mock_publish, mock_get_token, client, valid_payload):
         """Test handling of SQS publish failure."""
-        mock_ssm_client.get_parameter.return_value = {
-            'Parameter': {'Value': 'test-token-123'}
-        }
+        mock_get_token.return_value = 'test-token-123'
         mock_publish.return_value = False
 
         response = client.post('/process',
@@ -207,18 +239,18 @@ class TestProcessEndpoint:
         data = json.loads(response.data)
         assert data['error'] == 'Failed to publish message to queue'
 
-    @patch('app.ssm_client')
-    def test_ssm_parameter_fetch_failure(self, mock_ssm_client, client, valid_payload):
-        """Test handling of SSM parameter fetch failure."""
-        mock_ssm_client.get_parameter.side_effect = Exception('SSM Error')
+    @patch('app.get_auth_token')
+    def test_get_auth_token_failure(self, mock_get_token, client, valid_payload):
+        """Test handling of get_auth_token failure."""
+        mock_get_token.side_effect = Exception('SSM Error')
 
         response = client.post('/process',
                               data=json.dumps(valid_payload),
                               content_type='application/json')
 
-        assert response.status_code == 500
+        assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'error' in data
+        assert data['error'] == 'Token validation failed'
 
     def test_get_method_not_allowed(self, client):
         """Test that GET method is not allowed on /process endpoint."""
