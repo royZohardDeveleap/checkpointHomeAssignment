@@ -1,0 +1,243 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'service1/**'
+      - 'service2/**'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'service1/**'
+      - 'service2/**'
+
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT:
+  dev: 
+
+jobs:
+  # ============================================================================
+  # DETECT CHANGED SERVICES
+  # ============================================================================
+
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      service1: ${{ steps.filter.outputs.service1 }}
+      service2: ${{ steps.filter.outputs.service2 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for service changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            service1:
+              - 'service1/**'
+            service2:
+              - 'service2/**'
+
+  # ============================================================================
+  # SERVICE 1 - TEST & BUILD
+  # ============================================================================
+
+  test-service1:
+    name: Test Service1
+    needs: detect-changes
+    if: needs.detect-changes.outputs.service1 == 'true'
+    uses: ./.github/workflows/test-service.yaml
+    with:
+      service: service1
+
+  build-service1:
+    name: Build Service1
+    needs: test-service1
+    if:  github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/build-service.yaml
+    with:
+      service: service1
+    secrets: inherit
+
+  # ============================================================================
+  # SERVICE 2 - TEST & BUILD
+  # ============================================================================
+
+  test-service2:
+    name: Test Service2
+    needs: detect-changes
+    if: needs.detect-changes.outputs.service2 == 'true'
+    uses: ./.github/workflows/test-service.yaml
+    with:
+      service: service2
+
+  build-service2:
+    name: Build Service2
+    needs: test-service2
+    if:  github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/build-service.yaml
+    with:
+      service: service2
+    secrets: inherit
+
+  # ============================================================================
+  # TRIGGER CD PIPELINE
+  # ============================================================================
+
+  trigger-cd:
+    name: Trigger CD Pipeline
+    needs: [detect-changes, build-service1, build-service2]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      (needs.build-service1.result == 'success' || needs.build-service2.result == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger CD workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const service1Changed = '${{ needs.detect-changes.outputs.service1 }}' === 'true';
+            const service2Changed = '${{ needs.detect-changes.outputs.service2 }}' === 'true';
+            const service1Success = '${{ needs.build-service1.result }}' === 'success';
+            const service2Success = '${{ needs.build-service2.result }}' === 'success';
+
+            // Build list of services to deploy
+            const services = [];
+            if (service1Changed && service1Success) services.push('service1');
+            if (service2Changed && service2Success) services.push('service2');
+
+            if (services.length > 0) {
+              console.log(`Triggering CD for: ${services.join(', ')}`);
+
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'cd-pipeline.yaml',
+                ref: 'main',
+                inputs: {
+                  services: services.join(','),
+                  triggered_by: 'ci-pipeline'
+                }
+              });
+            } else {
+              console.log('No services to deploy');
+            }
+
+  # ============================================================================
+  # CI SUMMARY
+  # ============================================================================
+
+  summary:
+    name: CI Summary
+    needs: [detect-changes, test-service1, build-service1, test-service2, build-service2]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate CI summary
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Services Changed" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.detect-changes.outputs.service1 }}" == "true" ]; then
+            echo "- ✅ Service1 changed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚪ Service1 unchanged" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.service2 }}" == "true" ]; then
+            echo "- ✅ Service2 changed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚪ Service2 unchanged" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### CI Stages" >> $GITHUB_STEP_SUMMARY
+
+          # Service1 results
+          if [ "${{ needs.detect-changes.outputs.service1 }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Service1:**" >> $GITHUB_STEP_SUMMARY
+
+            if [ "${{ needs.test-service1.result }}" == "success" ]; then
+              echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ Test: ${{ needs.test-service1.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "${{ needs.build-service1.result }}" == "success" ]; then
+              echo "- ✅ Build: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ Build: ${{ needs.build-service1.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          # Service2 results
+          if [ "${{ needs.detect-changes.outputs.service2 }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Service2:**" >> $GITHUB_STEP_SUMMARY
+
+            if [ "${{ needs.test-service2.result }}" == "success" ]; then
+              echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ Test: ${{ needs.test-service2.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "${{ needs.build-service2.result }}" == "success" ]; then
+              echo "- ✅ Build: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ Build: ${{ needs.build-service2.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          SERVICE1_OK="true"
+          SERVICE2_OK="true"
+
+          if [ "${{ needs.detect-changes.outputs.service1 }}" == "true" ]; then
+            if [ "${{ needs.test-service1.result }}" != "success" ] || [ "${{ needs.build-service1.result }}" != "success" ]; then
+              SERVICE1_OK="false"
+            fi
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.service2 }}" == "true" ]; then
+            if [ "${{ needs.test-service2.result }}" != "success" ] || [ "${{ needs.build-service2.result }}" != "success" ]; then
+              SERVICE2_OK="false"
+            fi
+          fi
+
+          if [ "$SERVICE1_OK" == "true" ] && [ "$SERVICE2_OK" == "true" ]; then
+            echo "### 🎉 CI Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All changed services have been tested and built." >> $GITHUB_STEP_SUMMARY
+
+            if [ "${{ github.ref }}" == "refs/heads/main" ] && [ "${{ github.event_name }}" == "push" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "CD pipeline will be triggered automatically." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### ⚠️ CI Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the failed jobs for details." >> $GITHUB_STEP_SUMMARY
+          fi

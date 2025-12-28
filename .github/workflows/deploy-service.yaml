@@ -1,0 +1,201 @@
+name: Deploy Service to ECS
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: 'Service to deploy (service1 or service2)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to deploy (optional, defaults to value in SSM)'
+        required: false
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.9.0
+
+jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: terraform/applications
+
+    steps:
+      # ========================================================================
+      # CHECKOUT CODE
+      # ========================================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ========================================================================
+      # CONFIGURE AWS CREDENTIALS
+      # ========================================================================
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ========================================================================
+      # SETUP TERRAFORM
+      # ========================================================================
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # ========================================================================
+      # TERRAFORM INIT
+      # ========================================================================
+
+      - name: Terraform Init
+        run: terraform init
+
+      # ========================================================================
+      # UPDATE IMAGE TAG (if provided)
+      # ========================================================================
+
+      - name: Update image tag in SSM Parameter Store
+        if: inputs.image_tag != ''
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          echo "Updating SSM parameter for ${SERVICE} with image tag: ${IMAGE_TAG}"
+
+          # Get project name from terraform output or default
+          PROJECT_NAME="devops-practice"
+          ENV="dev"
+
+          # Update the SSM parameter with the new image tag
+          aws ssm put-parameter \
+            --name "/${PROJECT_NAME}/${ENV}/${SERVICE}/image-tag" \
+            --value "${IMAGE_TAG}" \
+            --type "String" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ SSM parameter updated: /${PROJECT_NAME}/${ENV}/${SERVICE}/image-tag = ${IMAGE_TAG}"
+
+      # ========================================================================
+      # TERRAFORM PLAN
+      # ========================================================================
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          echo "Planning deployment..."
+          echo "Terraform will read image tags from SSM Parameter Store"
+
+          terraform plan \
+            -out=tfplan \
+            -input=false
+
+      # ========================================================================
+      # TERRAFORM APPLY
+      # ========================================================================
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          echo "Applying Terraform changes..."
+          echo "Only services with updated tags in SSM will be redeployed"
+
+          terraform apply \
+            -auto-approve \
+            -input=false \
+            tfplan
+
+      # ========================================================================
+      # GET DEPLOYMENT INFO
+      # ========================================================================
+
+      - name: Get deployment info
+        id: deployment-info
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: |
+          # Get ECS cluster name
+          CLUSTER_NAME=$(terraform output -raw deployment_info | jq -r '.cluster_name')
+          echo "cluster_name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+
+          # Get the specific service name based on input
+          SERVICE_NAME=$(terraform output -raw ${SERVICE}_name)
+          echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
+
+          # Get the image for this service
+          DEPLOYMENT_INFO=$(terraform output -json deployment_info)
+          SERVICE_IMAGE=$(echo $DEPLOYMENT_INFO | jq -r ".${SERVICE}_image")
+          echo "service_image=${SERVICE_IMAGE}" >> $GITHUB_OUTPUT
+
+      # ========================================================================
+      # WAIT FOR DEPLOYMENT
+      # ========================================================================
+
+      - name: Wait for ECS service to stabilize
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: |
+          CLUSTER="${{ steps.deployment-info.outputs.cluster_name }}"
+          SERVICE_NAME="${{ steps.deployment-info.outputs.service_name }}"
+
+          echo "Waiting for ${SERVICE} (${SERVICE_NAME}) to stabilize on cluster ${CLUSTER}..."
+
+          aws ecs wait services-stable \
+            --cluster ${CLUSTER} \
+            --services ${SERVICE_NAME} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ ${SERVICE_NAME} is stable and running"
+
+      # ========================================================================
+      # SUMMARY
+      # ========================================================================
+
+      - name: Output deployment summary
+        env:
+          SERVICE: ${{ inputs.service }}
+          CLUSTER_NAME: ${{ steps.deployment-info.outputs.cluster_name }}
+          SERVICE_NAME: ${{ steps.deployment-info.outputs.service_name }}
+          SERVICE_IMAGE: ${{ steps.deployment-info.outputs.service_image }}
+        run: |
+          echo "## Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${SERVICE}" >> $GITHUB_STEP_SUMMARY
+          echo "**ECS Cluster:** ${CLUSTER_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "**ECS Service Name:** ${SERVICE_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${SERVICE_IMAGE}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Terraform applied changes based on SSM Parameter Store" >> $GITHUB_STEP_SUMMARY
+          echo "✅ ECS service updated with new task definition" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Service is stable and running" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Verify Deployment" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Check service status" >> $GITHUB_STEP_SUMMARY
+          echo "aws ecs describe-services --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# View running tasks" >> $GITHUB_STEP_SUMMARY
+          echo "aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# View task logs" >> $GITHUB_STEP_SUMMARY
+          echo "aws ecs describe-tasks --cluster ${CLUSTER_NAME} --tasks \$(aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --query 'taskArns[0]' --output text)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

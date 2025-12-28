@@ -1,0 +1,188 @@
+name: CD Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to deploy (comma-separated: service1,service2 or "all")'
+        required: true
+        type: string
+        default: 'all'
+      service1_image_tag:
+        description: 'Service1 image tag (optional, defaults to SSM value)'
+        required: false
+        type: string
+      service2_image_tag:
+        description: 'Service2 image tag (optional, defaults to SSM value)'
+        required: false
+        type: string
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        type: string
+        default: 'dev'
+      triggered_by:
+        description: 'Triggered by (internal use)'
+        required: false
+        type: string
+        default: 'manual'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ============================================================================
+  # DETERMINE SERVICES TO DEPLOY
+  # ============================================================================
+
+  determine-services:
+    name: Determine Services to Deploy
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_service1: ${{ steps.check.outputs.deploy_service1 }}
+      deploy_service2: ${{ steps.check.outputs.deploy_service2 }}
+
+    steps:
+      - name: Check which services to deploy
+        id: check
+        run: |
+          SERVICES="${{ inputs.services }}"
+
+          if [ "$SERVICES" == "all" ]; then
+            echo "deploy_service1=true" >> $GITHUB_OUTPUT
+            echo "deploy_service2=true" >> $GITHUB_OUTPUT
+            echo "Deploying all services"
+          else
+            # Parse comma-separated list
+            if echo "$SERVICES" | grep -q "service1"; then
+              echo "deploy_service1=true" >> $GITHUB_OUTPUT
+              echo "Deploying service1"
+            else
+              echo "deploy_service1=false" >> $GITHUB_OUTPUT
+            fi
+
+            if echo "$SERVICES" | grep -q "service2"; then
+              echo "deploy_service2=true" >> $GITHUB_OUTPUT
+              echo "Deploying service2"
+            else
+              echo "deploy_service2=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # ============================================================================
+  # DEPLOY SERVICE 1
+  # ============================================================================
+
+  deploy-service1:
+    name: Deploy Service1
+    needs: determine-services
+    if: needs.determine-services.outputs.deploy_service1 == 'true'
+    uses: ./.github/workflows/deploy-service.yaml
+    with:
+      service: service1
+      image_tag: ${{ inputs.service1_image_tag }}
+    secrets: inherit
+
+  # ============================================================================
+  # DEPLOY SERVICE 2
+  # ============================================================================
+
+  deploy-service2:
+    name: Deploy Service2
+    needs: determine-services
+    if: needs.determine-services.outputs.deploy_service2 == 'true'
+    uses: ./.github/workflows/deploy-service.yaml
+    with:
+      service: service2
+      image_tag: ${{ inputs.service2_image_tag }}
+    secrets: inherit
+
+  # ============================================================================
+  # CD SUMMARY
+  # ============================================================================
+
+  summary:
+    name: CD Summary
+    needs: [determine-services, deploy-service1, deploy-service2]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate CD summary
+        run: |
+          echo "## CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ inputs.triggered_by }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Services Deployed" >> $GITHUB_STEP_SUMMARY
+
+          # Service1 status
+          if [ "${{ needs.determine-services.outputs.deploy_service1 }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Service1:**" >> $GITHUB_STEP_SUMMARY
+
+            if [ -n "${{ inputs.service1_image_tag }}" ]; then
+              echo "- Image Tag: \`${{ inputs.service1_image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Image Tag: \`(from SSM Parameter Store)\`" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "${{ needs.deploy-service1.result }}" == "success" ]; then
+              echo "- Status: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Status: ❌ ${{ needs.deploy-service1.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⚪ Service1: Not deployed (not selected)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Service2 status
+          if [ "${{ needs.determine-services.outputs.deploy_service2 }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Service2:**" >> $GITHUB_STEP_SUMMARY
+
+            if [ -n "${{ inputs.service2_image_tag }}" ]; then
+              echo "- Image Tag: \`${{ inputs.service2_image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Image Tag: \`(from SSM Parameter Store)\`" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "${{ needs.deploy-service2.result }}" == "success" ]; then
+              echo "- Status: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Status: ❌ ${{ needs.deploy-service2.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⚪ Service2: Not deployed (not selected)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          SERVICE1_OK="true"
+          SERVICE2_OK="true"
+
+          if [ "${{ needs.determine-services.outputs.deploy_service1 }}" == "true" ]; then
+            if [ "${{ needs.deploy-service1.result }}" != "success" ]; then
+              SERVICE1_OK="false"
+            fi
+          fi
+
+          if [ "${{ needs.determine-services.outputs.deploy_service2 }}" == "true" ]; then
+            if [ "${{ needs.deploy-service2.result }}" != "success" ]; then
+              SERVICE2_OK="false"
+            fi
+          fi
+
+          if [ "$SERVICE1_OK" == "true" ] && [ "$SERVICE2_OK" == "true" ]; then
+            echo "### 🎉 CD Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All selected services have been deployed to ECS." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ CD Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the failed jobs for details." >> $GITHUB_STEP_SUMMARY
+          fi
