@@ -165,7 +165,7 @@ def root():
     """Root endpoint."""
     return jsonify({
         'service': 'service1',
-        'version': '1.0.0',
+        'version': os.environ.get('IMAGE_TAG', 'unknown'),
         'endpoints': {
             'health': '/health',
             'process': '/process (POST)'
