@@ -42,3 +42,15 @@ output "ecs_ami_name" {
   description = "ECS-optimized AMI name"
   value       = data.aws_ami.ecs_optimized.name
 }
+
+output "ecs_ami_details" {
+  description = "Detailed information about the ECS-optimized AMI"
+  value = {
+    ami_id             = local.ecs_ami_data.image_id
+    ami_name           = local.ecs_ami_data.image_name
+    ami_version        = local.ecs_ami_data.image_version
+    ecs_agent_version  = local.ecs_ami_data.ecs_agent_version
+    docker_version     = local.ecs_ami_data.ecs_runtime_version
+    os                 = local.ecs_ami_data.os
+  }
+}

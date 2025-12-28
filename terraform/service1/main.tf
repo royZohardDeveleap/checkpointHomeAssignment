@@ -25,27 +25,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ============================================================================
-# REMOTE STATE - Infrastructure
-# ============================================================================
-
-data "terraform_remote_state" "infrastructure" {
-  backend = "s3"
-
-  config = {
-    bucket = "ha-roy-develeap-dev-terraform-state"
-    key    = "infrastructure/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
-
-# ============================================================================
-# SSM PARAMETER - IMAGE TAG
-# ============================================================================
-
-data "aws_ssm_parameter" "image_tag" {
-  name = "/${var.project_name}/${var.environment}/service1/image-tag"
-}
 
 # ============================================================================
 # ECS TASK DEFINITION
@@ -57,13 +36,13 @@ resource "aws_ecs_task_definition" "service1" {
   requires_compatibilities = ["EC2"]
   cpu                      = var.cpu
   memory                   = var.memory
-  execution_role_arn       = data.terraform_remote_state.infrastructure.outputs.ecs_task_execution_role_arn
-  task_role_arn            = data.terraform_remote_state.infrastructure.outputs.service1_task_role_arn
+  execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = data.aws_iam_role.service1_task_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "service1"
-      image     = "${data.terraform_remote_state.infrastructure.outputs.ecr_service1_repository_url}:${data.aws_ssm_parameter.image_tag.value}"
+      image     = "${data.aws_ecr_repository.service1.repository_url}:${data.aws_ssm_parameter.image_tag.value}"
       essential = true
 
       portMappings = [
@@ -81,7 +60,7 @@ resource "aws_ecs_task_definition" "service1" {
         },
         {
           name  = "SQS_QUEUE_URL"
-          value = data.terraform_remote_state.infrastructure.outputs.sqs_queue_url
+          value = data.aws_sqs_queue.main.url
         },
         {
           name  = "AWS_REGION"
@@ -118,18 +97,18 @@ resource "aws_ecs_task_definition" "service1" {
 
 resource "aws_ecs_service" "service1" {
   name            = "${var.project_name}-${var.environment}-service1"
-  cluster         = data.terraform_remote_state.infrastructure.outputs.ecs_cluster_id
+  cluster         = data.aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.service1.arn
   desired_count   = var.desired_count
 
   load_balancer {
-    target_group_arn = data.terraform_remote_state.infrastructure.outputs.service1_target_group_arn
+    target_group_arn = data.aws_lb_target_group.service1.arn
     container_name   = "service1"
     container_port   = 8080
   }
 
   capacity_provider_strategy {
-    capacity_provider = data.terraform_remote_state.infrastructure.outputs.ecs_capacity_provider_name
+    capacity_provider = "${var.project_name}-${var.environment}-capacity-provider"
     weight            = 100
     base              = 1
   }

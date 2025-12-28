@@ -1,7 +1,9 @@
 Setup and create
 1. Run terraform setup-backup.sh
 2. Run terrform/infrastructure terraform apply 
-3. Run tasks/create-token-param.sh
+3. Run tasks/create-auth-token-param.sh
+4. Run CI workflow
+5. Run CD workflow
 
 
 Cleanup
@@ -13,3 +15,8 @@ Cleanup
 
 Thinks i would have added 
 Note delete buckeet ha-roy-develeap-dev-bucket
+Create bastion host module that  creates:
+- ec2 with SSM session manage and s3 permission iam role 
+- NAT gatway 
+- SSM sesion manager vpce
+

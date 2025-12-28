@@ -31,10 +31,10 @@ enable_monitoring = false
 # ECS CLUSTER CONFIGURATION
 # =============================================================================
 
-ecs_instance_type    = "t2.micro"  # Free tier eligible
-ecs_desired_capacity = 1
+ecs_instance_type    = "t3.micro" 
+ecs_desired_capacity = 2
 ecs_min_size         = 1
-ecs_max_size         = 2
+ecs_max_size         = 3
 
 # =============================================================================
 # STORAGE CONFIGURATION

@@ -129,6 +129,25 @@ resource "aws_vpc_endpoint" "ecs_telemetry" {
   )
 }
 
+# ECS Agent VPC Endpoint (for ACS - Agent Communication Service)
+resource "aws_vpc_endpoint" "ecs_agent" {
+  count = var.enable_vpc_endpoints ? 1 : 0
+
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecs-agent"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-${var.environment}-ecs-agent-endpoint"
+    }
+  )
+}
+
 # SSM Parameter Store VPC Endpoint
 resource "aws_vpc_endpoint" "ssm" {
   count = var.enable_vpc_endpoints ? 1 : 0
@@ -144,6 +163,44 @@ resource "aws_vpc_endpoint" "ssm" {
     var.common_tags,
     {
       Name = "${var.project_name}-${var.environment}-ssm-endpoint"
+    }
+  )
+}
+
+# SSM Messages VPC Endpoint (for Session Manager)
+resource "aws_vpc_endpoint" "ssmmessages" {
+  count = var.enable_vpc_endpoints ? 1 : 0
+
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-${var.environment}-ssmmessages-endpoint"
+    }
+  )
+}
+
+# EC2 Messages VPC Endpoint (for Session Manager)
+resource "aws_vpc_endpoint" "ec2messages" {
+  count = var.enable_vpc_endpoints ? 1 : 0
+
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ec2messages"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-${var.environment}-ec2messages-endpoint"
     }
   )
 }
