@@ -15,7 +15,6 @@ on:
       - 'tasks/service1/**'
       - 'tasks/service2/**'
 
-  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
