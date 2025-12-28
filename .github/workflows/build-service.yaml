@@ -26,13 +26,9 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
-      AWS_ACCOUNT_ID:
-        required: true
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-  ECR_REPOSITORY: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
 
 jobs:
   build-and-push:
@@ -157,7 +153,7 @@ jobs:
         with:
           context: ./tasks/${{ inputs.service }}
           push: true
-          tags: ${{ env.ECR_REGISTRY }}/${{env.ECR_REPOSITORY}}:${{steps.version.outputs.version}}
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.project_name }}/${{ inputs.environment }}/${{ inputs.service }}:${{ steps.version.outputs.version }}
 
 
       # ========================================================================
@@ -204,7 +200,7 @@ jobs:
             git tag -a "${GIT_TAG}" -m "Release ${SERVICE} version ${VERSION}" \
               -m "" \
               -m "Built and deployed via GitHub Actions" \
-              -m "Image: ${{ env.ECR_REGISTRY }}/${{ inputs.project_name }}-${{ inputs.environment }}-${SERVICE}:${VERSION}" \
+              -m "Image: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.project_name }}/${{ inputs.environment }}/${SERVICE}:${VERSION}" \
               -m "Commit: ${{ github.sha }}"
 
             git push origin "${GIT_TAG}"
@@ -221,11 +217,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           BASE_VERSION: ${{ steps.version.outputs.base_version }}
           SHORT_SHA: ${{ steps.version.outputs.short_sha }}
-          ECR_REPO_NAME: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO_NAME: ${{ inputs.project_name }}/${{ inputs.environment }}/${{ inputs.service }}
           PARAMETER_NAME: /${{ inputs.project_name }}/${{ inputs.environment }}/${{ inputs.service }}/image-tag
           GIT_TAG: ${{ inputs.service }}-v${{ steps.version.outputs.version }}
         run: |
-          IMAGE_URI="${{ env.ECR_REGISTRY }}/${ECR_REPO_NAME}:${VERSION}"
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPO_NAME}:${VERSION}"
 
           echo "## Build Summary 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
