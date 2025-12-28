@@ -1,0 +1,250 @@
+version: '3'
+
+# Project Taskfile for Home Assignment Infrastructure
+# Modular tasks for setup, deployment, and cleanup
+# See Steps file for detailed documentation
+
+vars:
+  PROJECT: ha-roy-develeap
+  ENV: dev
+  REGION: us-east-1
+  AWS_PROFILE: checkpoint
+
+tasks:
+  # ============================================================================
+  # SETUP - Complete Infrastructure Setup
+  # ============================================================================
+
+  setup:
+    desc: "Complete project setup (all steps in order)"
+    cmds:
+      - task: setup:backend
+      - task: setup:infrastructure
+      - task: setup:auth-token
+      - task: setup:build-and-deploy
+      - echo "✓ Setup complete! Run 'task info' to see endpoints"
+
+  setup:backend:
+    desc: "Step 1 - Create Terraform state backend"
+    dir: terraform
+    cmds:
+      - echo "Creating Terraform state backend..."
+      - ./setup-backend.sh
+
+  setup:infrastructure:
+    desc: "Step 2 - Deploy infrastructure (VPC, ECS, ALB, SQS, S3)"
+    dir: terraform/infrastructure
+    cmds:
+      - echo "Deploying infrastructure..."
+      - terraform init
+      - terraform apply -auto-approve
+
+  setup:auth-token:
+    desc: "Step 3 - Create authentication token parameter"
+    dir: tasks
+    cmds:
+      - echo "Creating auth token in SSM..."
+      - ./create-auth-token-param.sh
+    interactive: true
+
+  setup:build-and-deploy:
+    desc: "Step 4-5 - Build images and deploy services (via GitHub Actions)"
+    cmds:
+      - echo "Build and deployment happens via GitHub Actions:"
+      - echo "1. Push code to trigger CI workflow (builds images)"
+      - echo "2. CI triggers CD workflow (deploys to ECS)"
+      - echo ""
+      - echo "Or run manually:"
+      - echo "  - Build: gh workflow run ci-pipeline.yaml"
+      - echo "  - Deploy: gh workflow run cd-pipeline.yaml"
+
+  # ============================================================================
+  # BUILD - Individual Build Tasks
+  # ============================================================================
+
+  build:service1:
+    desc: "Build and push Service1 Docker image"
+    dir: tasks/service1
+    vars:
+      VERSION:
+        sh: git rev-parse --short HEAD || echo "local"
+    cmds:
+      - echo "Building service1:{{.VERSION}}..."
+      - docker build -t service1:{{.VERSION}} .
+      - echo "Image built: service1:{{.VERSION}}"
+
+  build:service2:
+    desc: "Build and push Service2 Docker image"
+    dir: tasks/service2
+    vars:
+      VERSION:
+        sh: git rev-parse --short HEAD || echo "local"
+    cmds:
+      - echo "Building service2:{{.VERSION}}..."
+      - docker build -t service2:{{.VERSION}} .
+      - echo "Image built: service2:{{.VERSION}}"
+
+  # ============================================================================
+  # TEST - Run Tests
+  # ============================================================================
+
+  test:service1:
+    desc: "Run Service1 unit tests"
+    dir: tasks/service1
+    cmds:
+      - pytest --cov=app --cov-report=term
+
+  test:service2:
+    desc: "Run Service2 unit tests"
+    dir: tasks/service2
+    cmds:
+      - pytest --cov=app --cov-report=term
+
+  test:all:
+    desc: "Run all unit tests"
+    cmds:
+      - task: test:service1
+      - task: test:service2
+
+  test:flow:
+    desc: "Test complete application flow (E2E)"
+    dir: tasks
+    cmds:
+      - ./test-flow.sh
+
+  # ============================================================================
+  # CLEANUP/DESTROY - Complete Teardown
+  # ============================================================================
+
+  destroy:
+    desc: "Complete project teardown (all steps in order)"
+    cmds:
+      - task: destroy:storage
+      - task: destroy:services
+      - task: destroy:infrastructure
+      - task: destroy:backend
+      - echo "✓ Teardown complete!"
+
+  destroy:storage:
+    desc: "Step 1 - Empty ECR repositories and S3 bucket"
+    dir: tasks
+    cmds:
+      - echo "Emptying storage resources..."
+      - ./cleanup-storage.sh
+
+  destroy:services:
+    desc: "Step 2-3 - Destroy ECS services"
+    cmds:
+      - task: destroy:service2
+      - task: destroy:service1
+
+  destroy:service1:
+    desc: "Destroy Service1"
+    dir: terraform/service1
+    cmds:
+      - terraform destroy -auto-approve
+
+  destroy:service2:
+    desc: "Destroy Service2"
+    dir: terraform/service2
+    cmds:
+      - terraform destroy -auto-approve
+
+  destroy:infrastructure:
+    desc: "Step 4 - Destroy infrastructure"
+    dir: terraform/infrastructure
+    cmds:
+      - echo "Destroying infrastructure..."
+      - terraform destroy -auto-approve
+
+  destroy:backend:
+    desc: "Step 5 - Delete Terraform state backend (LAST STEP)"
+    dir: terraform
+    cmds:
+      - echo "Deleting state backend..."
+      - ./delete-backend.sh
+
+  # ============================================================================
+  # INFO/STATUS - Display Information
+  # ============================================================================
+
+  info:
+    desc: "Show project information and endpoints"
+    cmds:
+      - |
+        echo "=== Project Information ==="
+        echo "Project: {{.PROJECT}}"
+        echo "Environment: {{.ENV}}"
+        echo "Region: {{.REGION}}"
+        echo ""
+
+        echo "=== Application Endpoints ==="
+        ALB_DNS=$(aws elbv2 describe-load-balancers \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}} \
+          --query "LoadBalancers[?contains(LoadBalancerName, '{{.PROJECT}}-{{.ENV}}')].DNSName" \
+          --output text 2>/dev/null || echo "")
+
+        if [ -n "$ALB_DNS" ]; then
+          echo "ALB: http://$ALB_DNS"
+          echo "Service1: http://$ALB_DNS/service1/"
+          echo "Service1 Health: http://$ALB_DNS/service1/health"
+        else
+          echo "Infrastructure not deployed"
+        fi
+
+  status:
+    desc: "Show ECS service status"
+    cmds:
+      - |
+        aws ecs describe-services \
+          --cluster {{.PROJECT}}-{{.ENV}}-cluster \
+          --services {{.PROJECT}}-{{.ENV}}-service1 {{.PROJECT}}-{{.ENV}}-service2 \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}} \
+          --query 'services[*].[serviceName,status,runningCount,desiredCount,deployments[0].rolloutState]' \
+          --output table 2>/dev/null || echo "Services not deployed"
+
+  # ============================================================================
+  # LOGS - View Service Logs
+  # ============================================================================
+
+  logs:service1:
+    desc: "Tail Service1 logs"
+    cmds:
+      - |
+        aws logs tail /ecs/{{.PROJECT}}-{{.ENV}}/service1 \
+          --follow \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}}
+
+  logs:service2:
+    desc: "Tail Service2 logs"
+    cmds:
+      - |
+        aws logs tail /ecs/{{.PROJECT}}-{{.ENV}}/service2 \
+          --follow \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}}
+
+  # ============================================================================
+  # UTILITY - Development Tasks
+  # ============================================================================
+
+  fmt:
+    desc: "Format Terraform code"
+    cmds:
+      - terraform fmt -recursive terraform/
+
+  validate:
+    desc: "Validate Terraform configurations"
+    cmds:
+      - |
+        for dir in terraform/backend terraform/infrastructure terraform/service1 terraform/service2; do
+          echo "Validating $dir..."
+          (cd $dir && terraform init -backend=false > /dev/null && terraform validate)
+        done
+
+  default:
+    cmds:
+      - task --list
