@@ -8,14 +8,11 @@ on:
         required: true
         type: string
         default: 'all'
-      service1_image_tag:
-        description: 'Service1 image tag (optional, defaults to SSM value)'
-        required: false
+      project_name:
+        description: 'Name of the project'
+        required: true
         type: string
-      service2_image_tag:
-        description: 'Service2 image tag (optional, defaults to SSM value)'
-        required: false
-        type: string
+        default: ha-roy-develeap        
       environment:
         description: 'Environment to deploy to'
         required: false
@@ -80,7 +77,6 @@ jobs:
     uses: ./.github/workflows/deploy-service.yaml
     with:
       service: service1
-      image_tag: ${{ inputs.service1_image_tag }}
     secrets: inherit
 
   # ============================================================================
@@ -94,7 +90,6 @@ jobs:
     uses: ./.github/workflows/deploy-service.yaml
     with:
       service: service2
-      image_tag: ${{ inputs.service2_image_tag }}
     secrets: inherit
 
   # ============================================================================
@@ -113,6 +108,7 @@ jobs:
           echo "## CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Project Name:** ${{ inputs.project_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Triggered by:** ${{ inputs.triggered_by }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

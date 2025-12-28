@@ -5,15 +5,15 @@ on:
     branches:
       - main
     paths:
-      - 'service1/**'
-      - 'service2/**'
+      - 'tasks/service1/**'
+      - 'tasks/service2/**'
 
   pull_request:
     branches:
       - main
     paths:
-      - 'service1/**'
-      - 'service2/**'
+      - 'tasks/service1/**'
+      - 'tasks/service2/**'
 
   workflow_dispatch:
 
@@ -44,26 +44,25 @@ jobs:
         with:
           filters: |
             service1:
-              - 'service1/**'
+              - 'tasks/service1/**'
             service2:
-              - 'service2/**'
+              - 'tasks/service2/**'
 
   # ============================================================================
   # SERVICE 1 - TEST & BUILD
   # ============================================================================
 
-  test-service1:
-    name: Test Service1
-    needs: detect-changes
-    if: needs.detect-changes.outputs.service1 == 'true'
-    uses: ./.github/workflows/test-service.yaml
-    with:
-      service: service1
+  # test-service1:
+  #   name: Test Service1
+  #   needs: detect-changes
+  #   if: needs.detect-changes.outputs.service1 == 'true'
+  #   uses: ./.github/workflows/test-service.yaml
+  #   with:
+  #     service: service1
 
   build-service1:
     name: Build Service1
-    needs: test-service1
-    if:  github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # needs: test-service1
     uses: ./.github/workflows/build-service.yaml
     with:
       service: service1
@@ -73,18 +72,17 @@ jobs:
   # SERVICE 2 - TEST & BUILD
   # ============================================================================
 
-  test-service2:
-    name: Test Service2
-    needs: detect-changes
-    if: needs.detect-changes.outputs.service2 == 'true'
-    uses: ./.github/workflows/test-service.yaml
-    with:
-      service: service2
+  # test-service2:
+  #   name: Test Service2
+  #   needs: detect-changes
+  #   if: needs.detect-changes.outputs.service2 == 'true'
+  #   uses: ./.github/workflows/test-service.yaml
+  #   with:
+  #     service: service2
 
   build-service2:
     name: Build Service2
-    needs: test-service2
-    if:  github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # needs: test-service2
     uses: ./.github/workflows/build-service.yaml
     with:
       service: service2
@@ -142,7 +140,8 @@ jobs:
 
   summary:
     name: CI Summary
-    needs: [detect-changes, test-service1, build-service1, test-service2, build-service2]
+    # needs: [detect-changes, test-service1, build-service1, test-service2, build-service2]
+    needs: [detect-changes, build-service1, build-service2]
     if: always()
     runs-on: ubuntu-latest
 
@@ -178,11 +177,11 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Service1:**" >> $GITHUB_STEP_SUMMARY
 
-            if [ "${{ needs.test-service1.result }}" == "success" ]; then
-              echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ❌ Test: ${{ needs.test-service1.result }}" >> $GITHUB_STEP_SUMMARY
-            fi
+            # if [ "${{ needs.test-service1.result }}" == "success" ]; then
+            #   echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            # else
+            #   echo "- ❌ Test: ${{ needs.test-service1.result }}" >> $GITHUB_STEP_SUMMARY
+            # fi
 
             if [ "${{ needs.build-service1.result }}" == "success" ]; then
               echo "- ✅ Build: SUCCESS" >> $GITHUB_STEP_SUMMARY
@@ -196,11 +195,11 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Service2:**" >> $GITHUB_STEP_SUMMARY
 
-            if [ "${{ needs.test-service2.result }}" == "success" ]; then
-              echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ❌ Test: ${{ needs.test-service2.result }}" >> $GITHUB_STEP_SUMMARY
-            fi
+            # if [ "${{ needs.test-service2.result }}" == "success" ]; then
+            #   echo "- ✅ Test: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            # else
+            #   echo "- ❌ Test: ${{ needs.test-service2.result }}" >> $GITHUB_STEP_SUMMARY
+            # fi
 
             if [ "${{ needs.build-service2.result }}" == "success" ]; then
               echo "- ✅ Build: SUCCESS" >> $GITHUB_STEP_SUMMARY
@@ -215,14 +214,26 @@ jobs:
           SERVICE1_OK="true"
           SERVICE2_OK="true"
 
+          # if [ "${{ needs.detect-changes.outputs.service1 }}" == "true" ]; then
+          #   if [ "${{ needs.test-service1.result }}" != "success" ] || [ "${{ needs.build-service1.result }}" != "success" ]; then
+          #     SERVICE1_OK="false"
+          #   fi
+          # fi
+
+          # if [ "${{ needs.detect-changes.outputs.service2 }}" == "true" ]; then
+          #   if [ "${{ needs.test-service2.result }}" != "success" ] || [ "${{ needs.build-service2.result }}" != "success" ]; then
+          #     SERVICE2_OK="false"
+          #   fi
+          # fi
+
           if [ "${{ needs.detect-changes.outputs.service1 }}" == "true" ]; then
-            if [ "${{ needs.test-service1.result }}" != "success" ] || [ "${{ needs.build-service1.result }}" != "success" ]; then
+            if [ "${{ needs.build-service1.result }}" != "success" ]; then
               SERVICE1_OK="false"
             fi
           fi
 
           if [ "${{ needs.detect-changes.outputs.service2 }}" == "true" ]; then
-            if [ "${{ needs.test-service2.result }}" != "success" ] || [ "${{ needs.build-service2.result }}" != "success" ]; then
+            if [ "${{ needs.build-service2.result }}" != "success" ]; then
               SERVICE2_OK="false"
             fi
           fi

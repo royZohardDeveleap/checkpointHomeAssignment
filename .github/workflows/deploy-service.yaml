@@ -7,10 +7,6 @@ on:
         description: 'Service to deploy (service1 or service2)'
         required: true
         type: string
-      image_tag:
-        description: 'Docker image tag to deploy (optional, defaults to value in SSM)'
-        required: false
-        type: string
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -67,32 +63,6 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-
-      # ========================================================================
-      # UPDATE IMAGE TAG (if provided)
-      # ========================================================================
-
-      - name: Update image tag in SSM Parameter Store
-        if: inputs.image_tag != ''
-        env:
-          SERVICE: ${{ inputs.service }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
-        run: |
-          echo "Updating SSM parameter for ${SERVICE} with image tag: ${IMAGE_TAG}"
-
-          # Get project name from terraform output or default
-          PROJECT_NAME="devops-practice"
-          ENV="dev"
-
-          # Update the SSM parameter with the new image tag
-          aws ssm put-parameter \
-            --name "/${PROJECT_NAME}/${ENV}/${SERVICE}/image-tag" \
-            --value "${IMAGE_TAG}" \
-            --type "String" \
-            --overwrite \
-            --region ${{ env.AWS_REGION }}
-
-          echo "✓ SSM parameter updated: /${PROJECT_NAME}/${ENV}/${SERVICE}/image-tag = ${IMAGE_TAG}"
 
       # ========================================================================
       # TERRAFORM PLAN

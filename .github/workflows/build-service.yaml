@@ -7,6 +7,16 @@ on:
         description: 'Service to build (service1 or service2)'
         required: true
         type: string
+      project_name:
+        description: 'Name of the project'
+        required: true
+        type: string
+        default: ha-roy-develeap
+      environment:
+        description: 'Environment of the project'
+        required: true
+        type: string
+        default: dev
     outputs:
       image_tag:
         description: 'The Docker image tag that was built'
@@ -17,10 +27,6 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
       AWS_ACCOUNT_ID:
-        required: true
-      PROJECT_NAME:
-        required: true
-      ENVIRONMENT:
         required: true
 
 env:
@@ -143,7 +149,7 @@ jobs:
       - name: Build and push Docker image
         working-directory: ./${{ inputs.service }}
         env:
-          ECR_REPOSITORY: ${{ secrets.PROJECT_NAME }}-${{ secrets.ENVIRONMENT }}-${{ inputs.service }}
+          ECR_REPOSITORY: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
           IMAGE_TAG: ${{ steps.version.outputs.version }}
         run: |
           echo "Building ${{ inputs.service }}..."
@@ -165,7 +171,7 @@ jobs:
         env:
           SERVICE: ${{ inputs.service }}
           IMAGE_TAG: ${{ steps.version.outputs.version }}
-          PARAMETER_NAME: /${{ secrets.PROJECT_NAME }}/${{ secrets.ENVIRONMENT }}/${{ inputs.service }}/image-tag
+          PARAMETER_NAME: /${{ inputs.project_name }}/${{ inputs.environment }}/${{ inputs.service }}/image-tag
         run: |
           echo "Storing image tag in SSM Parameter Store..."
           aws ssm put-parameter \
@@ -201,7 +207,7 @@ jobs:
             git tag -a "${GIT_TAG}" -m "Release ${SERVICE} version ${VERSION}" \
               -m "" \
               -m "Built and deployed via GitHub Actions" \
-              -m "Image: ${{ env.ECR_REGISTRY }}/${{ secrets.PROJECT_NAME }}-${{ secrets.ENVIRONMENT }}-${SERVICE}:${VERSION}" \
+              -m "Image: ${{ env.ECR_REGISTRY }}/${{ inputs.project_name }}-${{ inputs.environment }}-${SERVICE}:${VERSION}" \
               -m "Commit: ${{ github.sha }}"
 
             git push origin "${GIT_TAG}"
@@ -218,8 +224,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           BASE_VERSION: ${{ steps.version.outputs.base_version }}
           SHORT_SHA: ${{ steps.version.outputs.short_sha }}
-          ECR_REPO_NAME: ${{ secrets.PROJECT_NAME }}-${{ secrets.ENVIRONMENT }}-${{ inputs.service }}
-          PARAMETER_NAME: /${{ secrets.PROJECT_NAME }}/${{ secrets.ENVIRONMENT }}/${{ inputs.service }}/image-tag
+          ECR_REPO_NAME: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
+          PARAMETER_NAME: /${{ inputs.project_name }}/${{ inputs.environment }}/${{ inputs.service }}/image-tag
           GIT_TAG: ${{ inputs.service }}-v${{ steps.version.outputs.version }}
         run: |
           IMAGE_URI="${{ env.ECR_REGISTRY }}/${ECR_REPO_NAME}:${VERSION}"
