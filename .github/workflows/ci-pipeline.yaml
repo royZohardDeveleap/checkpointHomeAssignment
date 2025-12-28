@@ -73,6 +73,9 @@ jobs:
     if: needs.detect-changes.outputs.services != '[]'
     uses: ./.github/workflows/build-service.yaml
 
+    permissions:
+      contents: write  # Required for build-service.yaml to create git tags
+
     strategy:
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
