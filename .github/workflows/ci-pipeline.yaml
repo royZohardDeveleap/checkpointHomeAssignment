@@ -1,26 +1,24 @@
 name: CI Pipeline
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'tasks/service1/**'
-      - 'tasks/service2/**'
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'tasks/service1/**'
+#       - 'tasks/service2/**'
 
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'tasks/service1/**'
-      - 'tasks/service2/**'
+#   pull_request:
+#     branches:
+#       - main
+#     paths:
+#       - 'tasks/service1/**'
+#       - 'tasks/service2/**'
 
   workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
-  PROJECT:
-  dev: 
 
 jobs:
   # ============================================================================

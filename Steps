@@ -1,0 +1,10 @@
+Setup and create
+1. Run terraform setup-backup.sh
+2. Run terrform/infrastructure terraform apply 
+3. Run tasks/create-token-param.sh
+
+
+Cleanup
+1. Run terraform/applicaiton terraform destroy
+2. Run terraform/infrastructure terraform destroy 
+3. Run terraform delete-backup.sh

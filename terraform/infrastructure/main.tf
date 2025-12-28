@@ -103,6 +103,59 @@ module "ecr" {
 }
 
 # ============================================================================
+# STORAGE (S3 & SQS) - Base Resources
+# ============================================================================
+
+module "storage" {
+  source = "./modules/storage"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  common_tags = local.common_tags
+}
+
+# ============================================================================
+# IAM TASK ROLES
+# ============================================================================
+
+module "iam_roles" {
+  source = "./modules/iam-roles"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  aws_region    = var.aws_region
+
+  # Storage resource ARNs for role policies
+  sqs_queue_arn = module.storage.sqs_queue_arn
+  s3_bucket_arn = module.storage.s3_bucket_arn
+
+  common_tags = local.common_tags
+}
+
+# ============================================================================
+# STORAGE POLICIES
+# ============================================================================
+
+module "storage_policies" {
+  source = "./modules/storage-policies"
+
+  # Storage resources
+  s3_bucket_id  = module.storage.s3_bucket_name
+  s3_bucket_arn = module.storage.s3_bucket_arn
+  sqs_queue_url = module.storage.sqs_queue_url
+  sqs_queue_arn = module.storage.sqs_queue_arn
+
+  # Task role ARNs
+  service1_task_role_arn = module.iam_roles.service1_task_role_arn
+  service2_task_role_arn = module.iam_roles.service2_task_role_arn
+
+  # VPC endpoints
+  s3_vpc_endpoint_id  = module.networking.s3_vpc_endpoint_id
+  sqs_vpc_endpoint_id = module.networking.sqs_vpc_endpoint_id
+}
+
+# ============================================================================
 # MONITORING (GRAFANA) - Optional
 # ============================================================================
 

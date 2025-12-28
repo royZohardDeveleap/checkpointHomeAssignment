@@ -142,6 +142,59 @@ output "grafana_log_group_name" {
 }
 
 # =============================================================================
+# STORAGE OUTPUTS
+# =============================================================================
+
+output "s3_bucket_name" {
+  description = "S3 bucket name"
+  value       = module.storage.s3_bucket_name
+}
+
+output "s3_bucket_arn" {
+  description = "S3 bucket ARN"
+  value       = module.storage.s3_bucket_arn
+}
+
+output "sqs_queue_url" {
+  description = "SQS queue URL"
+  value       = module.storage.sqs_queue_url
+}
+
+output "sqs_queue_arn" {
+  description = "SQS queue ARN"
+  value       = module.storage.sqs_queue_arn
+}
+
+output "sqs_queue_name" {
+  description = "SQS queue name"
+  value       = module.storage.sqs_queue_name
+}
+
+# =============================================================================
+# IAM ROLE OUTPUTS
+# =============================================================================
+
+output "service1_task_role_arn" {
+  description = "ARN of Service 1 task role"
+  value       = module.iam_roles.service1_task_role_arn
+}
+
+output "service1_task_role_name" {
+  description = "Name of Service 1 task role"
+  value       = module.iam_roles.service1_task_role_name
+}
+
+output "service2_task_role_arn" {
+  description = "ARN of Service 2 task role"
+  value       = module.iam_roles.service2_task_role_arn
+}
+
+output "service2_task_role_name" {
+  description = "Name of Service 2 task role"
+  value       = module.iam_roles.service2_task_role_name
+}
+
+# =============================================================================
 # GENERAL OUTPUTS
 # =============================================================================
 

@@ -1,0 +1,363 @@
+{
+  "dashboard": {
+    "title": "System Overview",
+    "uid": "system-overview",
+    "version": 1,
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "30s",
+    "tags": ["ecs", "sqs", "alb"],
+    "templating": {
+      "list": [
+        {
+          "name": "cluster_name",
+          "type": "constant",
+          "label": "ECS Cluster",
+          "current": {
+            "value": "checkpoint-home-assignment-royzohar-dev-cluster"
+          },
+          "options": [
+            {
+              "value": "checkpoint-home-assignment-royzohar-dev-cluster",
+              "text": "checkpoint-home-assignment-royzohar-dev-cluster"
+            }
+          ]
+        },
+        {
+          "name": "queue_name",
+          "type": "constant",
+          "label": "SQS Queue",
+          "current": {
+            "value": "checkpoint-home-assignment-royzohar-dev-queue"
+          },
+          "options": [
+            {
+              "value": "checkpoint-home-assignment-royzohar-dev-queue",
+              "text": "checkpoint-home-assignment-royzohar-dev-queue"
+            }
+          ]
+        },
+        {
+          "name": "service1_name",
+          "type": "constant",
+          "label": "Service 1",
+          "current": {
+            "value": "checkpoint-home-assignment-royzohar-dev-service1"
+          },
+          "options": [
+            {
+              "value": "checkpoint-home-assignment-royzohar-dev-service1",
+              "text": "checkpoint-home-assignment-royzohar-dev-service1"
+            }
+          ]
+        },
+        {
+          "name": "service2_name",
+          "type": "constant",
+          "label": "Service 2",
+          "current": {
+            "value": "checkpoint-home-assignment-royzohar-dev-service2"
+          },
+          "options": [
+            {
+              "value": "checkpoint-home-assignment-royzohar-dev-service2",
+              "text": "checkpoint-home-assignment-royzohar-dev-service2"
+            }
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster CPU Utilization",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensions": {"ClusterName": ["${cluster_name}"]},
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %", "max": 100},
+          {"format": "short"}
+        ],
+        "legend": {"show": false}
+      },
+      {
+        "id": 2,
+        "title": "Cluster Memory Utilization",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "MemoryUtilization",
+            "dimensions": {"ClusterName": ["${cluster_name}"]},
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Memory %", "max": 100},
+          {"format": "short"}
+        ],
+        "legend": {"show": false}
+      },
+      {
+        "id": 3,
+        "title": "Running Tasks",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "ECS/ContainerInsights",
+            "metricName": "RunningTaskCount",
+            "dimensions": {"ClusterName": ["${cluster_name}"]},
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Service 1 - CPU",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensions": {
+              "ServiceName": ["${service1_name}"],
+              "ClusterName": ["${cluster_name}"]
+            },
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %", "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Service 1 - Memory",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "MemoryUtilization",
+            "dimensions": {
+              "ServiceName": ["${service1_name}"],
+              "ClusterName": ["${cluster_name}"]
+            },
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Memory %", "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Service 2 - CPU",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensions": {
+              "ServiceName": ["${service2_name}"],
+              "ClusterName": ["${cluster_name}"]
+            },
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %", "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Service 2 - Memory",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ECS",
+            "metricName": "MemoryUtilization",
+            "dimensions": {
+              "ServiceName": ["${service2_name}"],
+              "ClusterName": ["${cluster_name}"]
+            },
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Memory %", "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "SQS - Messages Visible",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 18},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/SQS",
+            "metricName": "ApproximateNumberOfMessagesVisible",
+            "dimensions": {"QueueName": ["${queue_name}"]},
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Messages"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "SQS - Messages In Flight",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 18},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/SQS",
+            "metricName": "ApproximateNumberOfMessagesNotVisible",
+            "dimensions": {"QueueName": ["${queue_name}"]},
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Messages"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "SQS - Oldest Message Age",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 18},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/SQS",
+            "metricName": "ApproximateAgeOfOldestMessage",
+            "dimensions": {"QueueName": ["${queue_name}"]},
+            "statistic": "Maximum",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Age (seconds)"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [300], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "type": "query"
+            }
+          ],
+          "name": "SQS Message Age Alert",
+          "message": "Messages are stuck in queue for more than 5 minutes"
+        }
+      },
+      {
+        "id": 11,
+        "title": "ALB - Request Count",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ApplicationELB",
+            "metricName": "RequestCount",
+            "dimensions": {
+              "LoadBalancer": ["app/checkpoint-home-assignment-royzohar-dev-alb"]
+            },
+            "statistic": "Sum",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Requests"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 12,
+        "title": "ALB - Target Response Time",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+            "namespace": "AWS/ApplicationELB",
+            "metricName": "TargetResponseTime",
+            "dimensions": {
+              "LoadBalancer": ["app/checkpoint-home-assignment-royzohar-dev-alb"]
+            },
+            "statistic": "Average",
+            "period": "60"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Response Time"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}
