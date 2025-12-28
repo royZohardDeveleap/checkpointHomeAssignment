@@ -141,8 +141,6 @@ module "storage_policies" {
   source = "./modules/storage-policies"
 
   # Storage resources
-  s3_bucket_id  = module.storage.s3_bucket_name
-  s3_bucket_arn = module.storage.s3_bucket_arn
   sqs_queue_url = module.storage.sqs_queue_url
   sqs_queue_arn = module.storage.sqs_queue_arn
 
@@ -151,7 +149,6 @@ module "storage_policies" {
   service2_task_role_arn = module.iam_roles.service2_task_role_arn
 
   # VPC endpoints
-  s3_vpc_endpoint_id  = module.networking.s3_vpc_endpoint_id
   sqs_vpc_endpoint_id = module.networking.sqs_vpc_endpoint_id
 }
 

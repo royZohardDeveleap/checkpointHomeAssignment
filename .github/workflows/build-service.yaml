@@ -32,6 +32,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
 
 jobs:
   build-and-push:
@@ -154,26 +155,10 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: ./tasks/${{ inputs.service }}
           push: true
-          tags: user/app:latest
-          
+          tags: ${{ env.ECR_REGISTRY }}/${{env.ECR_REPOSITORY}}:${{steps.version.outputs.version}}
 
-      - name: Build and push Docker image
-        working-directory: ./${{ inputs.service }}
-        env:
-          ECR_REPOSITORY: ${{ inputs.project_name }}-${{ inputs.environment }}-${{ inputs.service }}
-          IMAGE_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          echo "Building ${{ inputs.service }}..."
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY:latest
-
-          echo "Pushing ${{ inputs.service }} to ECR..."
-          docker push ${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push ${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY:latest
-
-          echo "✓ ${{ inputs.service }}:$IMAGE_TAG pushed successfully"
 
       # ========================================================================
       # STORE IMAGE TAG IN SSM PARAMETER STORE

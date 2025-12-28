@@ -8,3 +8,8 @@ Cleanup
 1. Run terraform/applicaiton terraform destroy
 2. Run terraform/infrastructure terraform destroy 
 3. Run terraform delete-backup.sh
+
+
+
+Thinks i would have added 
+Note delete buckeet ha-roy-develeap-dev-bucket

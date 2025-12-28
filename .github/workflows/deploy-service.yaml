@@ -27,7 +27,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/applications
+        working-directory: terraform/${{ inputs.service }}
 
     steps:
       # ========================================================================
@@ -102,18 +102,22 @@ jobs:
         env:
           SERVICE: ${{ inputs.service }}
         run: |
-          # Get ECS cluster name
-          CLUSTER_NAME=$(terraform output -raw deployment_info | jq -r '.cluster_name')
-          echo "cluster_name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
-
-          # Get the specific service name based on input
-          SERVICE_NAME=$(terraform output -raw ${SERVICE}_name)
+          # Get service name from terraform output
+          SERVICE_NAME=$(terraform output -raw service_name)
           echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
 
-          # Get the image for this service
-          DEPLOYMENT_INFO=$(terraform output -json deployment_info)
-          SERVICE_IMAGE=$(echo $DEPLOYMENT_INFO | jq -r ".${SERVICE}_image")
-          echo "service_image=${SERVICE_IMAGE}" >> $GITHUB_OUTPUT
+          # Get task definition ARN
+          TASK_DEF_ARN=$(terraform output -raw task_definition_arn)
+          echo "task_definition_arn=${TASK_DEF_ARN}" >> $GITHUB_OUTPUT
+
+          # Get image tag from terraform output
+          IMAGE_TAG=$(terraform output -raw image_tag)
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+          # Build cluster name from infrastructure outputs
+          # We'll need to read it from infrastructure remote state
+          # For now, use a constructed name based on project/environment
+          echo "cluster_name=ha-roy-develeap-dev-cluster" >> $GITHUB_OUTPUT
 
       # ========================================================================
       # WAIT FOR DEPLOYMENT
@@ -144,17 +148,20 @@ jobs:
           SERVICE: ${{ inputs.service }}
           CLUSTER_NAME: ${{ steps.deployment-info.outputs.cluster_name }}
           SERVICE_NAME: ${{ steps.deployment-info.outputs.service_name }}
-          SERVICE_IMAGE: ${{ steps.deployment-info.outputs.service_image }}
+          IMAGE_TAG: ${{ steps.deployment-info.outputs.image_tag }}
+          TASK_DEF_ARN: ${{ steps.deployment-info.outputs.task_definition_arn }}
         run: |
           echo "## Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** ${SERVICE}" >> $GITHUB_STEP_SUMMARY
           echo "**ECS Cluster:** ${CLUSTER_NAME}" >> $GITHUB_STEP_SUMMARY
           echo "**ECS Service Name:** ${SERVICE_NAME}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${SERVICE_IMAGE}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Task Definition:** \`${TASK_DEF_ARN}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Status" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Terraform applied changes based on SSM Parameter Store" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Terraform applied changes for ${SERVICE} only" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Other services remain unchanged" >> $GITHUB_STEP_SUMMARY
           echo "✅ ECS service updated with new task definition" >> $GITHUB_STEP_SUMMARY
           echo "✅ Service is stable and running" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
