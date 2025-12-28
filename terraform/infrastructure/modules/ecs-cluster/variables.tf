@@ -47,12 +47,6 @@ variable "max_size" {
   default     = 4
 }
 
-variable "enable_container_insights" {
-  description = "Enable CloudWatch Container Insights"
-  type        = bool
-  default     = true
-}
-
 variable "aws_region" {
   description = "AWS region"
   type        = string

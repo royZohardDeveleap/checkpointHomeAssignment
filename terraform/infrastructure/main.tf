@@ -13,11 +13,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "${var.project_name}-${var.environment}-state-bucket"
+    bucket         = "ha-roy-develeap-dev-terraform-state"
     key            = "infrastructure/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "terraform-state-lock"
+    dynamodb_table = "terraform-state-lock-roy-develeap"
   }
 }
 
@@ -76,11 +76,10 @@ module "ecs_cluster" {
   private_subnet_ids     = module.networking.private_subnet_ids
   alb_security_group_id  = module.alb.alb_security_group_id
 
-  instance_type             = var.ecs_instance_type
-  desired_capacity          = var.ecs_desired_capacity
-  min_size                  = var.ecs_min_size
-  max_size                  = var.ecs_max_size
-  enable_container_insights = var.enable_container_insights
+  instance_type    = var.ecs_instance_type
+  desired_capacity = var.ecs_desired_capacity
+  min_size         = var.ecs_min_size
+  max_size         = var.ecs_max_size
 
   aws_region = var.aws_region
 
@@ -118,7 +117,7 @@ module "monitoring" {
   capacity_provider_name  = module.ecs_cluster.capacity_provider_name
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
 
-  grafana_repository_url = module.storage.ecr_grafana_repository_url
+  grafana_repository_url = module.ecr.grafana_repository_url
   grafana_image_tag      = var.grafana_image_tag
   admin_password         = var.grafana_admin_password
 

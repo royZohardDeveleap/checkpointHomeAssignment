@@ -2,14 +2,6 @@
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-${var.environment}-cluster"
 
-  dynamic "setting" {
-    for_each = var.enable_container_insights ? [1] : []
-    content {
-      name  = "containerInsights"
-      value = "enabled"
-    }
-  }
-
   tags = merge(
     var.common_tags,
     {

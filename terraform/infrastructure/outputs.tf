@@ -75,22 +75,22 @@ output "ecs_ami_name" {
 }
 
 # =============================================================================
-# ECR OUTPUTS (from storage module)
+# ECR OUTPUTS (from ECR module)
 # =============================================================================
 
 output "ecr_service1_repository_url" {
   description = "ECR repository URL for Service 1"
-  value       = module.storage.ecr_service1_repository_url
+  value       = module.ecr.service1_repository_url
 }
 
 output "ecr_service2_repository_url" {
   description = "ECR repository URL for Service 2"
-  value       = module.storage.ecr_service2_repository_url
+  value       = module.ecr.service2_repository_url
 }
 
 output "ecr_grafana_repository_url" {
   description = "ECR repository URL for Grafana"
-  value       = var.enable_monitoring ? module.storage.ecr_grafana_repository_url : null
+  value       = var.enable_monitoring ? module.ecr.grafana_repository_url : null
 }
 
 # =============================================================================

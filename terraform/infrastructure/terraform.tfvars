@@ -5,7 +5,7 @@
 # PROJECT CONFIGURATION
 # =============================================================================
 
-project_name = "checkpoint-home-assignment-royzohar"
+project_name = "ha-roy-develeap"
 environment  = "dev"
 aws_region   = "us-east-1"
 
@@ -26,10 +26,6 @@ enable_vpc_endpoints = true
 # Enable Grafana monitoring service
 # This creates the Grafana ECR repository and ALB target group
 enable_monitoring = false
-
-# Enable ECS Container Insights
-# Provides detailed metrics but incurs additional CloudWatch costs (~$5-15/month)
-enable_container_insights = false
 
 # =============================================================================
 # ECS CLUSTER CONFIGURATION

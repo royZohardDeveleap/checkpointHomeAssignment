@@ -65,12 +65,6 @@ variable "enable_monitoring" {
   default     = false
 }
 
-variable "enable_container_insights" {
-  description = "Enable ECS Container Insights"
-  type        = bool
-  default     = true
-}
-
 # Storage Configuration
 variable "sqs_visibility_timeout" {
   description = "SQS visibility timeout in seconds"
