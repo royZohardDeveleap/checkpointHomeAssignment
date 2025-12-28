@@ -122,6 +122,10 @@ jobs:
       needs.build.result == 'success'
     runs-on: ubuntu-latest
 
+    permissions:
+      actions: write  # Required to trigger workflow_dispatch
+      contents: read
+
     steps:
       - name: Trigger CD workflow
         uses: actions/github-script@v7
