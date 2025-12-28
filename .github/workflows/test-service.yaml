@@ -13,6 +13,21 @@ on:
         type: string
         default: '3.11'
 
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service name (service1 or service2)'
+        required: true
+        type: choice
+        options:
+          - tasks/service1
+          - tasks/service2
+      python-version:
+        description: 'Python version to use'
+        required: false
+        type: string
+        default: '3.11'
+
 jobs:
   test:
     name: Test ${{ inputs.service }}
