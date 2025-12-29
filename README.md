@@ -998,7 +998,8 @@ Items that would improve this solution:
 
 ### Application
 - **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
-- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe reads SQS and triggers on-demand ECS tasks with message as input via containerOverrides environment variables
+- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe is triggered by mesage entering the SQS queue and and target is an an Service2 ECS task with message as input via containerOverrides environment variables or it reads message from the queue 
+- **Event-driven Service2 (Option 3: EventBridge Pipes + ECS RunTask)** - Expose a API endpoint for Service2 via VPC latice  refactor the source code to run a app that has an API webnook insteaed of the polling loop; EventBridge Pipe is triggeed by a message entering the SQS queue and the target is an API destination of the VPC lattice service with with a resoucee gateway depeloyed into the vpc to give the Eventbridge pipe access to it. The pipe sends a webhook to read messages from the queue 
 - **DLQ with redrive** - Dead Letter Queue for failed messages with redrive policy to move messages back to source queue after fixing issues
 - **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput in current polling implementation
 - **Visibility timeout tuning** - Adjust message visibility timeout based on processing time to prevent duplicate processing
