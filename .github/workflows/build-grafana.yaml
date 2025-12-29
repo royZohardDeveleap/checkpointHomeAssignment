@@ -41,24 +41,36 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Generate admin password
-        id: generate-password
+      - name: Handle admin password
+        id: handle-password
         run: |
+          PARAM_NAME="/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password"
+
+          # Check if password input was provided
           if [ -n "${{ github.event.inputs.admin_password }}" ]; then
+            # Password provided - store/update it
             PASSWORD="${{ github.event.inputs.admin_password }}"
+            echo "::add-mask::$PASSWORD"
+            echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+            echo "action=update" >> $GITHUB_OUTPUT
           else
-            # Generate a secure random password
-            PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-20)
+            # No password provided - check if parameter exists
+            if aws ssm get-parameter --name "$PARAM_NAME" --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+              echo "Password parameter exists, skipping password update"
+              echo "action=skip" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Error: No password provided and parameter does not exist"
+              echo "Please provide admin_password input to create the parameter"
+              exit 1
+            fi
           fi
 
-          echo "::add-mask::$PASSWORD"
-          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
-
       - name: Store admin password in SSM
+        if: steps.handle-password.outputs.action == 'update'
         run: |
           aws ssm put-parameter \
             --name "/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password" \
-            --value "${{ steps.generate-password.outputs.password }}" \
+            --value "${{ steps.handle-password.outputs.password }}" \
             --type "SecureString" \
             --overwrite \
             --description "Grafana admin password"
