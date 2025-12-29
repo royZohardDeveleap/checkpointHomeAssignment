@@ -155,37 +155,38 @@ jobs:
     if: |
       always() &&
       needs.build.result == 'success' &&
+      needs.detect-changes.outputs.services != '[]' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' && github.event.inputs.trigger_cd == 'true'))
     runs-on: ubuntu-latest
 
     permissions:
-      actions: write  # Required to trigger workflow_dispatch
-      contents: read
+      contents: write  # Required for repository_dispatch
+      actions: write
 
     steps:
-      - name: Trigger CD workflow
-        uses: actions/github-script@v7
+      - name: Prepare services list
+        id: prepare
+        run: |
+          # Convert JSON array to comma-separated string
+          services='${{ needs.detect-changes.outputs.services }}'
+          services_csv=$(echo "$services" | jq -r 'join(",")')
+          echo "services_csv=$services_csv" >> $GITHUB_OUTPUT
+          echo "Services to deploy: $services_csv"
+
+      - name: Trigger CD via repository_dispatch
+        uses: peter-evans/repository-dispatch@v4
         with:
-          script: |
-            // Get the list of services that were built successfully
-            const services = JSON.parse('${{ needs.detect-changes.outputs.services }}');
-
-            if (services.length > 0) {
-              console.log(`Triggering CD for: ${services.join(', ')}`);
-
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'cd-pipeline.yaml',
-                ref: 'main',
-                inputs: {
-                  services: services.join(','),
-                  triggered_by: 'ci-pipeline'
-                }
-              });
-            } else {
-              console.log('No services to deploy');
+          event-type: trigger-cd
+          client-payload: |
+            {
+              "services": "${{ steps.prepare.outputs.services_csv }}",
+              "project_name": "ha-roy-develeap",
+              "environment": "dev",
+              "triggered_by": "ci-pipeline",
+              "commit_sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "workflow_run_id": "${{ github.run_id }}"
             }
 
   # ============================================================================

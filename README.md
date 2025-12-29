@@ -973,9 +973,10 @@ Items that would improve this solution:
 - **SLO/SLA tracking** - Service level objectives with automated alerting
 
 ### Application
-- **Event-driven Service2** - SQS event source instead of polling
+- **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
+- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe reads SQS and triggers on-demand ECS tasks with message as input via containerOverrides environment variables
 - **DLQ with redrive** - Dead Letter Queue for failed messages with redrive policy to move messages back to source queue after fixing issues
-- **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput
+- **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput in current polling implementation
 - **Visibility timeout tuning** - Adjust message visibility timeout based on processing time to prevent duplicate processing
 - **Message delay configuration** - Use delay queues or per-message delay for retry backoff strategies
 - **Idempotency** - Prevent duplicate processing using message deduplication ID (FIFO queues) or application-level idempotency keys

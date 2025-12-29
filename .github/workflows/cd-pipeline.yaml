@@ -1,6 +1,8 @@
 name: CD Pipeline
 
 on:
+  repository_dispatch:
+    types: [trigger-cd]  # Custom event type for CI pipeline
   workflow_dispatch:
     inputs:
       services:
@@ -12,7 +14,7 @@ on:
         description: 'Name of the project'
         required: true
         type: string
-        default: ha-roy-develeap        
+        default: ha-roy-develeap
       environment:
         description: 'Environment to deploy to'
         required: false
@@ -23,6 +25,7 @@ on:
         required: false
         type: string
         default: 'manual'
+
 
 env:
   AWS_REGION: us-east-1
@@ -42,7 +45,17 @@ jobs:
       - name: Build service matrix
         id: build-matrix
         run: |
-          SERVICES="${{ inputs.services }}"
+          # Read from inputs (workflow_dispatch) or client_payload (repository_dispatch)
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            SERVICES="${{ github.event.client_payload.services }}"
+            echo "Triggered via repository_dispatch"
+            echo "Services from payload: $SERVICES"
+          else
+            SERVICES="${{ inputs.services }}"
+            echo "Triggered via workflow_dispatch"
+            echo "Services from inputs: $SERVICES"
+          fi
+
           services="[]"
 
           if [ "$SERVICES" == "all" ]; then
@@ -100,9 +113,28 @@ jobs:
           echo "## CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Project Name:** ${{ inputs.project_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ inputs.triggered_by }}" >> $GITHUB_STEP_SUMMARY
+
+          # Read from inputs (workflow_dispatch) or client_payload (repository_dispatch)
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            PROJECT_NAME="${{ github.event.client_payload.project_name }}"
+            ENVIRONMENT="${{ github.event.client_payload.environment }}"
+            TRIGGERED_BY="${{ github.event.client_payload.triggered_by }}"
+            COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
+          else
+            PROJECT_NAME="${{ inputs.project_name }}"
+            ENVIRONMENT="${{ inputs.environment }}"
+            TRIGGERED_BY="${{ inputs.triggered_by }}"
+            COMMIT_SHA="${{ github.sha }}"
+          fi
+
+          echo "**Project Name:** ${PROJECT_NAME:-ha-roy-develeap}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${ENVIRONMENT:-dev}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${TRIGGERED_BY:-manual}" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$COMMIT_SHA" ] && [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "**Source Commit:** \`${COMMIT_SHA}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### Services Deployed" >> $GITHUB_STEP_SUMMARY

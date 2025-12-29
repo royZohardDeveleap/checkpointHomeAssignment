@@ -120,47 +120,6 @@ jobs:
           echo "cluster_name=ha-roy-develeap-dev-cluster" >> $GITHUB_OUTPUT
 
       # ========================================================================
-      # FORCE STOP OLD TASKS
-      # ========================================================================
-
-      - name: Stop old running tasks
-        env:
-          SERVICE: ${{ inputs.service }}
-        run: |
-          CLUSTER="${{ steps.deployment-info.outputs.cluster_name }}"
-          SERVICE_NAME="${{ steps.deployment-info.outputs.service_name }}"
-
-          echo "Stopping old tasks for ${SERVICE_NAME} to free up resources..."
-
-          # Get all running tasks for this service
-          TASK_ARNS=$(aws ecs list-tasks \
-            --cluster ${CLUSTER} \
-            --service-name ${SERVICE_NAME} \
-            --desired-status RUNNING \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskArns[]' \
-            --output text)
-
-          if [ -n "$TASK_ARNS" ]; then
-            echo "Found tasks to stop: $TASK_ARNS"
-
-            # Stop each task
-            for TASK_ARN in $TASK_ARNS; do
-              echo "Stopping task: $TASK_ARN"
-              aws ecs stop-task \
-                --cluster ${CLUSTER} \
-                --task ${TASK_ARN} \
-                --reason "Deployment: forcing update to new task definition" \
-                --region ${{ env.AWS_REGION }} \
-                --no-cli-pager
-            done
-
-            echo "✓ Stopped old tasks to allow new deployment"
-          else
-            echo "No running tasks to stop"
-          fi
-
-      # ========================================================================
       # WAIT FOR DEPLOYMENT
       # ========================================================================
 
