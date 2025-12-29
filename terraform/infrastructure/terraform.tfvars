@@ -25,13 +25,13 @@ enable_vpc_endpoints = true
 
 # Enable Grafana monitoring service
 # This creates the Grafana ECR repository and ALB target group
-enable_monitoring = false
+enable_monitoring = true
 
 # =============================================================================
 # ECS CLUSTER CONFIGURATION
 # =============================================================================
 
 ecs_instance_type    = "t3.micro" 
-ecs_desired_capacity = 2
-ecs_min_size         = 1
-ecs_max_size         = 3
+ecs_desired_capacity = 3
+ecs_min_size         = 2
+ecs_max_size         = 4

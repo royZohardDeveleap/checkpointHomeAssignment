@@ -72,10 +72,20 @@ resource "aws_ecs_task_definition" "grafana" {
       protocol      = "tcp"
     }]
 
-    environment = [{
-      name  = "GF_SECURITY_ADMIN_PASSWORD"
-      value = data.aws_ssm_parameter.grafana_admin_password.value
-    }]
+    environment = [
+      {
+        name  = "GF_SECURITY_ADMIN_PASSWORD"
+        value = data.aws_ssm_parameter.grafana_admin_password.value
+      },
+      {
+        name  = "GF_SERVER_ROOT_URL"
+        value = "http://%(domain)s/grafana"
+      },
+      {
+        name  = "GF_SERVER_SERVE_FROM_SUB_PATH"
+        value = "true"
+      }
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"
