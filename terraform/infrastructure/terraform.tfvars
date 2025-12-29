@@ -35,15 +35,3 @@ ecs_instance_type    = "t3.micro"
 ecs_desired_capacity = 2
 ecs_min_size         = 1
 ecs_max_size         = 3
-
-# =============================================================================
-# STORAGE CONFIGURATION
-# =============================================================================
-
-# SQS queue visibility timeout (seconds)
-# Should be 6x the longest expected task processing time
-sqs_visibility_timeout = 30
-
-# SQS message retention (seconds)
-# Default: 345600 (4 days)
-sqs_message_retention = 345600

@@ -1,0 +1,140 @@
+name: Deploy Grafana
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tasks/grafana/**'
+
+  workflow_dispatch:
+    inputs:
+      admin_password:
+        description: 'Grafana admin password (leave empty to auto-generate)'
+        required: false
+        type: string
+      image_tag:
+        description: 'Docker image tag (leave empty to use git commit SHA)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT: ha-roy-develeap
+  ENV: dev
+
+jobs:
+  build-and-push:
+    name: Build and Push Grafana Image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for AWS OIDC
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate admin password
+        id: generate-password
+        run: |
+          if [ -n "${{ github.event.inputs.admin_password }}" ]; then
+            PASSWORD="${{ github.event.inputs.admin_password }}"
+          else
+            # Generate a secure random password
+            PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-20)
+          fi
+
+          echo "::add-mask::$PASSWORD"
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Store admin password in SSM
+        run: |
+          aws ssm put-parameter \
+            --name "/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password" \
+            --value "${{ steps.generate-password.outputs.password }}" \
+            --type "SecureString" \
+            --overwrite \
+            --description "Grafana admin password" \
+            --tags "Key=Project,Value=${{ env.PROJECT }}" "Key=Environment,Value=${{ env.ENV }}"
+
+      - name: Get image tag
+        id: image-tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            # Use git commit SHA as tag
+            TAG=$(git rev-parse --short HEAD)
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Image tag: $TAG"
+
+      - name: Build Grafana image
+        working-directory: tasks/grafana
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        run: |
+          docker build \
+            --tag $ECR_REGISTRY/${{ env.PROJECT }}/${{ env.ENV }}/grafana:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/${{ env.PROJECT }}/${{ env.ENV }}/grafana:latest \
+            .
+
+      - name: Push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        run: |
+          docker push $ECR_REGISTRY/${{ env.PROJECT }}/${{ env.ENV }}/grafana:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${{ env.PROJECT }}/${{ env.ENV }}/grafana:latest
+
+      - name: Update SSM parameter with image tag
+        run: |
+          aws ssm put-parameter \
+            --name "/${{ env.PROJECT }}/${{ env.ENV }}/grafana/image-tag" \
+            --value "${{ steps.image-tag.outputs.tag }}" \
+            --type "String" \
+            --overwrite \
+            --description "Grafana container image tag"
+
+      - name: Generate deployment summary
+        run: |
+          echo "## Grafana Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ steps.image-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**ECR Repository:** ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}/${{ env.ENV }}/grafana" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### SSM Parameters Created" >> $GITHUB_STEP_SUMMARY
+          echo "- Admin Password: \`/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image Tag: \`/${{ env.PROJECT }}/${{ env.ENV }}/grafana/image-tag\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Retrieve Admin Password" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "aws ssm get-parameter \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --name '/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password' \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --with-decryption \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --query 'Parameter.Value' \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --output text" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "Deploy Grafana service using Terraform with the new image tag" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## ⚠️ Grafana Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY

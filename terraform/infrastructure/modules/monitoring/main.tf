@@ -61,7 +61,7 @@ resource "aws_ecs_task_definition" "grafana" {
 
   container_definitions = jsonencode([{
     name      = "grafana"
-    image     = "${var.grafana_repository_url}:${var.grafana_image_tag}"
+    image     = "${var.grafana_repository_url}:${data.aws_ssm_parameter.grafana_image_tag.value}"
     cpu       = 256
     memory    = 512
     essential = true
@@ -74,7 +74,7 @@ resource "aws_ecs_task_definition" "grafana" {
 
     environment = [{
       name  = "GF_SECURITY_ADMIN_PASSWORD"
-      value = var.admin_password
+      value = data.aws_ssm_parameter.grafana_admin_password.value
     }]
 
     logConfiguration = {

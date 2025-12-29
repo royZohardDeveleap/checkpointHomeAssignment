@@ -1,3 +1,18 @@
+variable "s3_bucket_id" {
+  description = "S3 bucket ID"
+  type        = string
+}
+
+variable "s3_bucket_arn" {
+  description = "S3 bucket ARN"
+  type        = string
+}
+
+variable "s3_vpc_endpoint_id" {
+  description = "S3 VPC endpoint ID for bucket policy restriction"
+  type        = string
+}
+
 variable "sqs_queue_url" {
   description = "SQS queue URL"
   type        = string

@@ -65,29 +65,3 @@ variable "enable_monitoring" {
   default     = false
 }
 
-# Storage Configuration
-variable "sqs_visibility_timeout" {
-  description = "SQS visibility timeout in seconds"
-  type        = number
-  default     = 30
-}
-
-variable "sqs_message_retention" {
-  description = "SQS message retention period in seconds"
-  type        = number
-  default     = 345600
-}
-
-# Grafana Configuration
-variable "grafana_image_tag" {
-  description = "Grafana Docker image tag"
-  type        = string
-  default     = "latest"
-}
-
-variable "grafana_admin_password" {
-  description = "Grafana admin password"
-  type        = string
-  sensitive   = true
-  default     = "admin123"  # Change this in production!
-}

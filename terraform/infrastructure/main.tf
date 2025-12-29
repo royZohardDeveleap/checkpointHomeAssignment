@@ -140,7 +140,11 @@ module "iam_roles" {
 module "storage_policies" {
   source = "./modules/storage-policies"
 
-  # Storage resources
+  # S3 resources
+  s3_bucket_id  = module.storage.s3_bucket_name
+  s3_bucket_arn = module.storage.s3_bucket_arn
+
+  # SQS resources
   sqs_queue_url = module.storage.sqs_queue_url
   sqs_queue_arn = module.storage.sqs_queue_arn
 
@@ -149,6 +153,7 @@ module "storage_policies" {
   service2_task_role_arn = module.iam_roles.service2_task_role_arn
 
   # VPC endpoints
+  s3_vpc_endpoint_id  = module.networking.s3_vpc_endpoint_id
   sqs_vpc_endpoint_id = module.networking.sqs_vpc_endpoint_id
 }
 
@@ -168,8 +173,6 @@ module "monitoring" {
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
 
   grafana_repository_url = module.ecr.grafana_repository_url
-  grafana_image_tag      = var.grafana_image_tag
-  admin_password         = var.grafana_admin_password
 
   target_group_arn = module.alb.grafana_target_group_arn
 

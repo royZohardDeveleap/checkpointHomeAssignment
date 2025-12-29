@@ -28,18 +28,6 @@ variable "grafana_repository_url" {
   type        = string
 }
 
-variable "grafana_image_tag" {
-  description = "Grafana image tag"
-  type        = string
-  default     = "latest"
-}
-
-variable "admin_password" {
-  description = "Grafana admin password"
-  type        = string
-  sensitive   = true
-}
-
 variable "target_group_arn" {
   description = "ALB target group ARN for Grafana"
   type        = string

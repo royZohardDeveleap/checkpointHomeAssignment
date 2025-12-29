@@ -1,5 +1,36 @@
-# Storage Policies module - SQS resource policies
+# Storage Policies module - S3 and SQS resource policies
 # Created separately to avoid circular dependencies with IAM roles
+
+# ============================================================================
+# S3 BUCKET POLICY
+# ============================================================================
+
+# S3 Bucket Policy - Restrict upload operations to VPC endpoint only
+# Allows GET, DELETE, and bucket-level operations from anywhere
+resource "aws_s3_bucket_policy" "main" {
+  bucket = var.s3_bucket_id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DenyPutObjectNotFromVPCEndpoint"
+        Effect = "Deny"
+        Principal = "*"
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ]
+        Resource = "${var.s3_bucket_arn}/*"
+        Condition = {
+          StringNotEquals = {
+            "aws:SourceVpce" = var.s3_vpc_endpoint_id
+          }
+        }
+      }
+    ]
+  })
+}
 
 # ============================================================================
 # SQS QUEUE POLICY
