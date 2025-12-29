@@ -121,6 +121,7 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 │   │
 │   ├── create-auth-token-param.sh  # Create SSM auth token
 │   ├── cleanup-storage.sh          # Empty ECR/S3 resources
+│   ├── ssm-connect.sh              # Interactive SSM session to EC2 instances
 │   └── test-flow.sh                # End-to-end testing script
 │
 ├── terraform/                  # Infrastructure as Code
@@ -202,10 +203,10 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 ### AWS Setup
 
 1. **AWS Account** with appropriate permissions
-2. **AWS Profile** configured:
+2. **AWS CLI** configured with credentials:
    ```bash
-   aws configure --profile checkpoint
-   # Enter your AWS credentials
+   aws configure
+   # Enter your AWS credentials, region (us-east-1), and output format
    ```
 3. **Required IAM Permissions**:
    - VPC, EC2, ECS management
@@ -230,6 +231,10 @@ The fastest way to get started:
 brew install go-task/tap/go-task  # macOS
 # or
 sudo snap install task --classic  # Linux
+
+# Optional: Configure AWS profile in Taskfile.yml if using named profiles
+# Edit the AWS_PROFILE variable in Taskfile.yml (default: checkpoint)
+# Or remove --profile flags from Taskfile.yml if using default AWS credentials
 
 # Complete setup (all steps automated)
 task setup
@@ -402,7 +407,13 @@ open http://<ALB-DNS>/grafana
 
 - **Path-based detection** - Only builds changed services
 - **Parallel testing** - Tests run concurrently
-- **Automated tagging** - Git SHA-based image tags
+- **Semantic versioning** - Auto-incremented versions based on commit messages
+  - **Format**: `service1-v1.2.3`, `service2-v2.0.1` (per-service independent versioning)
+  - **MAJOR bump**: Commit message contains `BREAKING CHANGE` or `major:`
+  - **MINOR bump**: Commit message contains `feat:`, `feature:`, or `minor:`
+  - **PATCH bump**: Default for bug fixes, chores, and other changes
+- **Git tagging** - Auto-creates annotated tags for each build
+- **SSM integration** - Stores image tags in Parameter Store for deployment
 - **Repository dispatch** - Triggers CD pipeline automatically
 - **Matrix builds** - Builds multiple services in parallel
 
@@ -444,6 +455,60 @@ git push origin feature/new-feature
 # Create PR - triggers tests only, no builds
 ```
 
+### Semantic Versioning
+
+The CI pipeline automatically versions your services using **Semantic Versioning 2.0.0**:
+
+**Version Format**: `<service>-v<MAJOR>.<MINOR>.<PATCH>`
+
+Examples:
+- `service1-v1.0.0` - Initial release
+- `service1-v1.1.0` - Added new feature
+- `service1-v1.1.1` - Bug fix
+- `service2-v2.0.0` - Breaking change
+
+**Version Bumping Rules**:
+
+The version is automatically calculated based on commit messages since the last tag:
+
+1. **MAJOR version** (breaking changes):
+   ```bash
+   git commit -m "BREAKING CHANGE: redesign API endpoints"
+   git commit -m "major: remove deprecated authentication"
+   ```
+
+2. **MINOR version** (new features, backwards compatible):
+   ```bash
+   git commit -m "feat: add email validation"
+   git commit -m "feature: support batch processing"
+   git commit -m "minor: add new dashboard widget"
+   ```
+
+3. **PATCH version** (bug fixes, default):
+   ```bash
+   git commit -m "fix: resolve memory leak in worker"
+   git commit -m "chore: update dependencies"
+   git commit -m "docs: improve README"
+   ```
+
+**How It Works**:
+
+1. CI pipeline examines commit messages since last tag
+2. Determines highest priority bump (MAJOR > MINOR > PATCH)
+3. Increments version automatically
+4. Creates git tag: `service1-v1.2.3`
+5. Stores version in SSM Parameter Store
+6. CD pipeline reads version from SSM and deploys
+
+**Per-Service Versioning**:
+
+Each service has independent version numbers:
+- `service1-v2.3.5`
+- `service2-v1.0.2`
+- `grafana-v3.1.0`
+
+This allows services to evolve independently without coordinating version numbers.
+
 ## Testing
 
 ### Unit Tests
@@ -482,7 +547,6 @@ This script:
 TOKEN=$(aws ssm get-parameter \
   --name /ha-roy-develeap/dev/service1/auth-token \
   --with-decryption \
-  --profile checkpoint \
   --query 'Parameter.Value' \
   --output text)
 
@@ -501,12 +565,11 @@ curl -X POST http://${ALB_DNS}/service1/ \
 
 # Check SQS queue
 aws sqs get-queue-attributes \
-  --queue-url $(aws sqs get-queue-url --queue-name ha-roy-develeap-dev-queue --profile checkpoint --query 'QueueUrl' --output text) \
-  --attribute-names ApproximateNumberOfMessages \
-  --profile checkpoint
+  --queue-url $(aws sqs get-queue-url --queue-name ha-roy-develeap-dev-queue --query 'QueueUrl' --output text) \
+  --attribute-names ApproximateNumberOfMessages
 
 # List S3 objects
-aws s3 ls s3://ha-roy-develeap-dev-storage/ --recursive --profile checkpoint
+aws s3 ls s3://ha-roy-develeap-dev-storage/ --recursive
 ```
 
 ## Monitoring
@@ -515,12 +578,32 @@ aws s3 ls s3://ha-roy-develeap-dev-storage/ --recursive --profile checkpoint
 
 Access Grafana at: `http://<ALB-DNS>/grafana`
 
-**Default credentials**: `admin` / `admin` (change on first login)
+**Initial Setup**:
+
+Grafana has a separate build workflow for security (password management):
+
+```bash
+# Build and deploy Grafana with admin password
+gh workflow run build-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
+
+# Or build with default password (if already set in SSM)
+gh workflow run build-grafana.yaml
+```
+
+The workflow:
+1. Stores admin password securely in SSM Parameter Store (encrypted)
+2. Builds Grafana Docker image with pre-configured dashboards
+3. Pushes to ECR
+4. Grafana reads password from SSM on startup
+
+**Default credentials**: `admin` / `<password-from-SSM>`
 
 **Available Dashboards**:
 - **System Overview** - ECS cluster metrics, task counts, resource utilization
 - **Service Metrics** - Per-service CPU, memory, network stats
 - **Queue Monitoring** - SQS message counts and processing rates
+
+See [tasks/grafana/README.md](tasks/grafana/README.md) for dashboard details.
 
 ### CloudWatch Logs
 
@@ -534,7 +617,7 @@ task logs:service1
 task logs:service2
 
 # View logs in AWS Console
-aws logs tail /ecs/ha-roy-develeap-dev/service1 --follow --profile checkpoint
+aws logs tail /ecs/ha-roy-develeap-dev/service1 --follow
 ```
 
 ### Service Status
@@ -546,37 +629,78 @@ task status
 # Get detailed service info
 aws ecs describe-services \
   --cluster ha-roy-develeap-dev-cluster \
-  --services ha-roy-develeap-dev-service1 ha-roy-develeap-dev-service2 \
-  --profile checkpoint
+  --services ha-roy-develeap-dev-service1 ha-roy-develeap-dev-service2
 ```
 
 ### EC2 Instance Access
 
-Since this uses EC2 launch type, you can connect to the container instances:
+Since this uses EC2 launch type, you can connect to the container instances for debugging.
+
+**Method 1: Interactive SSM Connect Script (Recommended)**
+
+```bash
+cd tasks
+./ssm-connect.sh
+
+# Optional arguments:
+# --cluster CLUSTER_NAME    # Default: ha-roy-develeap-dev-cluster
+# --instance INSTANCE_ID    # Skip interactive selection
+# --profile PROFILE_NAME    # AWS profile to use
+```
+
+This script will:
+1. List all ECS container instances with their status
+2. Show running task counts and ECS agent health
+3. Verify SSM Agent is online
+4. Start an interactive SSM session
+5. Provide helpful commands for debugging
+
+**Method 2: Manual AWS CLI**
 
 ```bash
 # List ECS container instances
 aws ecs list-container-instances \
-  --cluster ha-roy-develeap-dev-cluster \
-  --profile checkpoint
+  --cluster ha-roy-develeap-dev-cluster
 
 # Get EC2 instance IDs
 aws ecs describe-container-instances \
   --cluster ha-roy-develeap-dev-cluster \
   --container-instances <CONTAINER-INSTANCE-ARN> \
-  --profile checkpoint \
   --query 'containerInstances[*].ec2InstanceId'
 
 # Connect via SSM Session Manager (no SSH keys needed)
 aws ssm start-session \
-  --target <EC2-INSTANCE-ID> \
-  --profile checkpoint
+  --target <EC2-INSTANCE-ID>
+```
 
-# Once connected, you can:
-# - View running containers: docker ps
-# - Check container logs: docker logs <container-id>
-# - Inspect ECS agent: cat /etc/ecs/ecs.config
-# - Monitor resources: top, htop
+**Useful Commands Once Connected:**
+
+```bash
+# View running containers
+docker ps
+
+# Check container logs
+docker logs <container-id>
+
+# Follow container logs in real-time
+docker logs -f <container-id>
+
+# Inspect ECS agent config
+sudo cat /etc/ecs/ecs.config
+
+# Check ECS agent status
+sudo systemctl status ecs
+
+# View ECS agent logs
+sudo cat /var/log/ecs/ecs-agent.log
+
+# Monitor system resources
+top
+htop
+df -h
+
+# Restart ECS agent if needed
+sudo systemctl restart ecs
 ```
 
 ## Cleanup
@@ -650,13 +774,13 @@ cd terraform
 
 ```bash
 # Verify ECS resources are gone
-aws ecs list-clusters --profile checkpoint
+aws ecs list-clusters
 
 # Verify S3 buckets are gone
-aws s3 ls --profile checkpoint | grep ha-roy-develeap
+aws s3 ls | grep ha-roy-develeap
 
 # Verify ECR repositories are gone
-aws ecr describe-repositories --profile checkpoint | grep ha-roy-develeap
+aws ecr describe-repositories | grep ha-roy-develeap
 ```
 
 ## Available Commands
@@ -714,6 +838,12 @@ task destroy:backend        # Delete Terraform backend
 task fmt                    # Format Terraform code
 task validate               # Validate Terraform configs
 task --list                 # Show all available tasks
+
+# Utility scripts (in tasks/ directory)
+./tasks/ssm-connect.sh      # Interactive SSM session to EC2 instances
+./tasks/test-flow.sh        # End-to-end integration test
+./tasks/create-auth-token-param.sh  # Create/update auth token in SSM
+./tasks/cleanup-storage.sh  # Empty ECR and S3 before teardown
 ```
 
 ## Architecture Decisions
@@ -823,8 +953,7 @@ task logs:service1
 # Verify token exists in SSM
 aws ssm get-parameter \
   --name /ha-roy-develeap/dev/service1/auth-token \
-  --with-decryption \
-  --profile checkpoint
+  --with-decryption
 
 # Recreate token if needed
 cd tasks
@@ -837,14 +966,13 @@ cd tasks
 # Check SQS queue depth
 aws sqs get-queue-attributes \
   --queue-url <QUEUE-URL> \
-  --attribute-names All \
-  --profile checkpoint
+  --attribute-names All
 
 # Check Service2 logs
 task logs:service2
 
 # Verify S3 bucket permissions
-aws s3 ls s3://ha-roy-develeap-dev-storage/ --profile checkpoint
+aws s3 ls s3://ha-roy-develeap-dev-storage/
 ```
 
 ## Contributing
