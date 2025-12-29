@@ -12,57 +12,77 @@
           "name": "cluster_name",
           "type": "constant",
           "label": "ECS Cluster",
+          "hide": 0,
           "current": {
-            "value": "ha-roy-develeap-dev-cluster"
+            "value": "ha-roy-develeap-dev-cluster",
+            "text": "ha-roy-develeap-dev-cluster",
+            "selected": false
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-cluster",
-              "text": "ha-roy-develeap-dev-cluster"
+              "text": "ha-roy-develeap-dev-cluster",
+              "selected": true
             }
-          ]
+          ],
+          "query": "ha-roy-develeap-dev-cluster"
         },
         {
           "name": "queue_name",
           "type": "constant",
           "label": "SQS Queue",
+          "hide": 0,
           "current": {
-            "value": "ha-roy-develeap-dev-queue"
+            "value": "ha-roy-develeap-dev-queue",
+            "text": "ha-roy-develeap-dev-queue",
+            "selected": false
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-queue",
-              "text": "ha-roy-develeap-dev-queue"
+              "text": "ha-roy-develeap-dev-queue",
+              "selected": true
             }
-          ]
+          ],
+          "query": "ha-roy-develeap-dev-queue"
         },
         {
           "name": "service1_name",
           "type": "constant",
           "label": "Service 1",
+          "hide": 0,
           "current": {
-            "value": "ha-roy-develeap-dev-service1"
+            "value": "ha-roy-develeap-dev-service1",
+            "text": "ha-roy-develeap-dev-service1",
+            "selected": false
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-service1",
-              "text": "ha-roy-develeap-dev-service1"
+              "text": "ha-roy-develeap-dev-service1",
+              "selected": true
             }
-          ]
+          ],
+          "query": "ha-roy-develeap-dev-service1"
         },
         {
           "name": "service2_name",
           "type": "constant",
           "label": "Service 2",
+          "hide": 0,
           "current": {
-            "value": "ha-roy-develeap-dev-service2"
+            "value": "ha-roy-develeap-dev-service2",
+            "text": "ha-roy-develeap-dev-service2",
+            "selected": false
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-service2",
-              "text": "ha-roy-develeap-dev-service2"
+              "text": "ha-roy-develeap-dev-service2",
+              "selected": true
             }
-          ]
+          ],
+          "query": "ha-roy-develeap-dev-service2"
         }
       ]
     },
@@ -71,7 +91,7 @@
         "id": 1,
         "title": "Cluster CPU Utilization",
         "type": "graph",
-        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
         "targets": [
           {
             "refId": "A",
@@ -93,7 +113,7 @@
         "id": 2,
         "title": "Cluster Memory Utilization",
         "type": "graph",
-        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
             "refId": "A",
@@ -110,35 +130,6 @@
           {"format": "short"}
         ],
         "legend": {"show": false}
-      },
-      {
-        "id": 3,
-        "title": "Running Tasks",
-        "type": "stat",
-        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
-        "targets": [
-          {
-            "refId": "A",
-            "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
-            "namespace": "ECS/ContainerInsights",
-            "metricName": "RunningTaskCount",
-            "dimensions": {"ClusterName": ["${cluster_name}"]},
-            "statistic": "Average",
-            "period": "60"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {"mode": "thresholds"},
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 1, "color": "green"}
-              ]
-            }
-          }
-        }
       },
       {
         "id": 4,

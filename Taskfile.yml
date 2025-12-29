@@ -55,8 +55,8 @@ tasks:
       - echo "2. CI triggers CD workflow (deploys to ECS)"
       - echo ""
       - echo "Or run manually:"
-      - echo "  - Build: gh workflow run ci-pipeline.yaml"
-      - echo "  - Deploy: gh workflow run cd-pipeline.yaml"
+      - echo "  - Build - gh workflow run ci-pipeline.yaml"
+      - echo "  - Deploy - gh workflow run cd-pipeline.yaml"
 
   # ============================================================================
   # BUILD - Individual Build Tasks
@@ -69,9 +69,9 @@ tasks:
       VERSION:
         sh: git rev-parse --short HEAD || echo "local"
     cmds:
-      - echo "Building service1:{{.VERSION}}..."
+      - echo "Building service1 {{.VERSION}}..."
       - docker build -t service1:{{.VERSION}} .
-      - echo "Image built: service1:{{.VERSION}}"
+      - echo "Image built service1 {{.VERSION}}"
 
   build:service2:
     desc: "Build and push Service2 Docker image"
@@ -80,9 +80,9 @@ tasks:
       VERSION:
         sh: git rev-parse --short HEAD || echo "local"
     cmds:
-      - echo "Building service2:{{.VERSION}}..."
+      - echo "Building service2 {{.VERSION}}..."
       - docker build -t service2:{{.VERSION}} .
-      - echo "Image built: service2:{{.VERSION}}"
+      - echo "Image built service2 {{.VERSION}}"
 
   # ============================================================================
   # TEST - Run Tests
@@ -226,6 +226,118 @@ tasks:
           --follow \
           --region {{.REGION}} \
           --profile {{.AWS_PROFILE}}
+
+  # ============================================================================
+  # DEPLOYMENT - Force Service Updates
+  # ============================================================================
+
+  deploy:force:
+    desc: "Force deployment of a service (SERVICE=service1|service2|grafana)"
+    cmds:
+      - |
+        if [ -z "{{.SERVICE}}" ]; then
+          echo "❌ Error: SERVICE variable required"
+          echo "Usage: task deploy:force SERVICE=service1"
+          echo "       task deploy:force SERVICE=service2"
+          echo "       task deploy:force SERVICE=grafana"
+          exit 1
+        fi
+
+        CLUSTER="{{.PROJECT}}-{{.ENV}}-cluster"
+        SERVICE_NAME="{{.PROJECT}}-{{.ENV}}-{{.SERVICE}}"
+
+        echo "Getting latest task definition for $SERVICE_NAME..."
+        LATEST_TD=$(aws ecs list-task-definitions \
+          --family-prefix $SERVICE_NAME \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}} \
+          --sort DESC \
+          --max-items 1 \
+          --query 'taskDefinitionArns[0]' \
+          --output text)
+
+        if [ -z "$LATEST_TD" ]; then
+          echo "❌ Error: No task definition found for $SERVICE_NAME"
+          exit 1
+        fi
+
+        echo "Latest task definition: $LATEST_TD"
+        echo "Updating service to use latest task definition..."
+
+        aws ecs update-service \
+          --cluster $CLUSTER \
+          --service $SERVICE_NAME \
+          --task-definition $LATEST_TD \
+          --force-new-deployment \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}} \
+          --no-cli-pager > /dev/null
+
+        echo "✓ Service update initiated"
+        echo ""
+        echo "Stopping old running tasks..."
+
+        TASK_ARNS=$(aws ecs list-tasks \
+          --cluster $CLUSTER \
+          --service-name $SERVICE_NAME \
+          --desired-status RUNNING \
+          --region {{.REGION}} \
+          --profile {{.AWS_PROFILE}} \
+          --query 'taskArns[]' \
+          --output text)
+
+        if [ -n "$TASK_ARNS" ]; then
+          for TASK_ARN in $TASK_ARNS; do
+            TASK_ID=$(echo $TASK_ARN | awk -F/ '{print $NF}')
+            TD_ARN=$(aws ecs describe-tasks \
+              --cluster $CLUSTER \
+              --tasks $TASK_ARN \
+              --region {{.REGION}} \
+              --profile {{.AWS_PROFILE}} \
+              --query 'tasks[0].taskDefinitionArn' \
+              --output text)
+
+            if [ "$TD_ARN" != "$LATEST_TD" ]; then
+              echo "Stopping old task: $TASK_ID (using $TD_ARN)"
+              aws ecs stop-task \
+                --cluster $CLUSTER \
+                --task $TASK_ARN \
+                --reason "Force deployment to latest task definition" \
+                --region {{.REGION}} \
+                --profile {{.AWS_PROFILE}} \
+                --no-cli-pager > /dev/null
+            else
+              echo "Task $TASK_ID already using latest task definition"
+            fi
+          done
+          echo "✓ Old tasks stopped"
+        else
+          echo "No running tasks found"
+        fi
+
+        echo ""
+        echo "✓ Force deployment complete for {{.SERVICE}}"
+
+  deploy:force:service1:
+    desc: "Force deployment of service1"
+    cmds:
+      - task: deploy:force
+        vars:
+          SERVICE: service1
+
+  deploy:force:service2:
+    desc: "Force deployment of service2"
+    cmds:
+      - task: deploy:force
+        vars:
+          SERVICE: service2
+
+  deploy:force:grafana:
+    desc: "Force deployment of grafana"
+    cmds:
+      - task: deploy:force
+        vars:
+          SERVICE: grafana
 
   # ============================================================================
   # UTILITY - Development Tasks
