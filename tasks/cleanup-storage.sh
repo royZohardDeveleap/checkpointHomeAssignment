@@ -102,36 +102,7 @@ cleanup_s3_bucket() {
     echo "Found ${object_count} objects in bucket"
     echo "Deleting all objects and versions..."
 
-    # Delete all objects and versions
-    aws s3api list-object-versions \
-        --bucket "${bucket_name}" \
-        --region "${REGION}" \
-        --profile "${AWS_PROFILE}" \
-        --output json \
-        --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
-        | jq -r '.Objects[] | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' \
-        | xargs -I {} -P 10 aws s3api delete-object \
-            --bucket "${bucket_name}" \
-            --region "${REGION}" \
-            --profile "${AWS_PROFILE}" {} \
-        2>/dev/null || true
-
-    # Delete all delete markers
-    aws s3api list-object-versions \
-        --bucket "${bucket_name}" \
-        --region "${REGION}" \
-        --profile "${AWS_PROFILE}" \
-        --output json \
-        --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
-        | jq -r '.Objects[]? | "--key \"\(.Key)\" --version-id \"\(.VersionId)\""' \
-        | xargs -I {} -P 10 aws s3api delete-object \
-            --bucket "${bucket_name}" \
-            --region "${REGION}" \
-            --profile "${AWS_PROFILE}" {} \
-        2>/dev/null || true
-
-    # Alternative: Force delete all (simpler but less parallel)
-    # aws s3 rm "s3://${bucket_name}" --recursive --region "${REGION}" --profile "${AWS_PROFILE}"
+    aws s3 rm "s3://${bucket_name}" --recursive --region "${REGION}" --profile "${AWS_PROFILE}"
 
     echo -e "${GREEN}Deleted all objects from ${bucket_name}${NC}"
 }
