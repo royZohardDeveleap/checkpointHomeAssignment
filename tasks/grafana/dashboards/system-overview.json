@@ -10,79 +10,75 @@
       "list": [
         {
           "name": "cluster_name",
-          "type": "constant",
+          "type": "custom",
           "label": "ECS Cluster",
           "hide": 0,
+          "query": "ha-roy-develeap-dev-cluster",
+          "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-cluster",
-            "text": "ha-roy-develeap-dev-cluster",
-            "selected": false
+            "text": "ha-roy-develeap-dev-cluster"
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-cluster",
-              "text": "ha-roy-develeap-dev-cluster",
-              "selected": true
+              "text": "ha-roy-develeap-dev-cluster"
             }
-          ],
-          "query": "ha-roy-develeap-dev-cluster"
+          ]
         },
         {
           "name": "queue_name",
-          "type": "constant",
+          "type": "custom",
           "label": "SQS Queue",
           "hide": 0,
+          "query": "ha-roy-develeap-dev-queue",
+          "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-queue",
-            "text": "ha-roy-develeap-dev-queue",
-            "selected": false
+            "text": "ha-roy-develeap-dev-queue"
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-queue",
-              "text": "ha-roy-develeap-dev-queue",
-              "selected": true
+              "text": "ha-roy-develeap-dev-queue"
             }
-          ],
-          "query": "ha-roy-develeap-dev-queue"
+          ]
         },
         {
           "name": "service1_name",
-          "type": "constant",
+          "type": "custom",
           "label": "Service 1",
           "hide": 0,
+          "query": "ha-roy-develeap-dev-service1",
+          "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-service1",
-            "text": "ha-roy-develeap-dev-service1",
-            "selected": false
+            "text": "ha-roy-develeap-dev-service1"
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-service1",
-              "text": "ha-roy-develeap-dev-service1",
-              "selected": true
+              "text": "ha-roy-develeap-dev-service1"
             }
-          ],
-          "query": "ha-roy-develeap-dev-service1"
+          ]
         },
         {
           "name": "service2_name",
-          "type": "constant",
+          "type": "custom",
           "label": "Service 2",
           "hide": 0,
+          "query": "ha-roy-develeap-dev-service2",
+          "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-service2",
-            "text": "ha-roy-develeap-dev-service2",
-            "selected": false
+            "text": "ha-roy-develeap-dev-service2"
           },
           "options": [
             {
               "value": "ha-roy-develeap-dev-service2",
-              "text": "ha-roy-develeap-dev-service2",
-              "selected": true
+              "text": "ha-roy-develeap-dev-service2"
             }
-          ],
-          "query": "ha-roy-develeap-dev-service2"
+          ]
         }
       ]
     },
