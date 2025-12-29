@@ -11,5 +11,5 @@ output "service2_repository_url" {
 
 output "grafana_repository_url" {
   description = "ECR repository URL for Grafana"
-  value       = var.enable_grafana ? aws_ecr_repository.grafana[0].repository_url : null
+  value       = aws_ecr_repository.grafana.repository_url
 }

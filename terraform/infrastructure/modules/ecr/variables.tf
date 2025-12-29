@@ -13,12 +13,6 @@ variable "aws_account_id" {
   type        = string
 }
 
-variable "enable_grafana" {
-  description = "Enable Grafana ECR repository"
-  type        = bool
-  default     = false
-}
-
 variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

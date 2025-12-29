@@ -97,8 +97,6 @@ module "ecr" {
   environment    = var.environment
   aws_account_id = data.aws_caller_identity.current.account_id
 
-  enable_grafana = var.enable_monitoring
-
   common_tags = local.common_tags
 }
 
