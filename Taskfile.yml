@@ -44,7 +44,7 @@ tasks:
     dir: tasks
     cmds:
       - echo "Creating auth token in SSM..."
-      - ./create-auth-token-param.sh
+      - ./create-auth-token-param.sh --profile ${AWS_PROFILE}
     interactive: true
 
   setup:build-and-deploy:
