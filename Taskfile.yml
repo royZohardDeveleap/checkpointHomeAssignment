@@ -50,13 +50,16 @@ tasks:
   setup:build-and-deploy:
     desc: "Step 4-5 - Build images and deploy services (via GitHub Actions)"
     cmds:
-      - echo "Build and deployment happens via GitHub Actions:"
-      - echo "1. Push code to trigger CI workflow (builds images)"
-      - echo "2. CI triggers CD workflow (deploys to ECS)"
+      - echo "Build and deployment happens via GitHub Actions."
       - echo ""
-      - echo "Or run manually:"
-      - echo "  - Build - gh workflow run ci-pipeline.yaml"
-      - echo "  - Deploy - gh workflow run cd-pipeline.yaml"
+      - echo "To build and deploy services:"
+      - echo ""
+      - echo "  1. Go to GitHub Actions tab in your repository"
+      - echo "  2. Run 'CI Pipeline' workflow to build images"
+      - echo "  3. Run 'CD Pipeline' workflow to deploy services"
+      - echo "     - Select 'all' for services to deploy"
+      - echo ""
+      - echo "Or push code to main branch to trigger automatically."
 
   # ============================================================================
   # BUILD - Individual Build Tasks
@@ -89,14 +92,19 @@ tasks:
   # ============================================================================
 
   deploy:monitoring:
-    desc: "Deploy Grafana monitoring service (terraform/monitoring)"
-    dir: terraform/monitoring
+    desc: "Deploy Grafana monitoring service (via GitHub Actions)"
     cmds:
-      - echo "Deploying Grafana monitoring..."
-      - terraform init
-      - terraform apply -auto-approve
-      - echo "✓ Monitoring deployed"
-      - echo "Note Grafana image must be built first (gh workflow run build-deploy-grafana.yaml)"
+      - echo "Grafana monitoring deployment happens via GitHub Actions."
+      - echo ""
+      - echo "To build and deploy Grafana monitoring:"
+      - echo ""
+      - echo "  1. Go to GitHub Actions tab in your repository"
+      - echo "  2. Run 'Build and Deploy Grafana' workflow"
+      - echo ""
+      - echo "This workflow will:"
+      - echo "  - Build the Grafana Docker image"
+      - echo "  - Push to ECR"
+      - echo "  - Deploy via Terraform"
 
   # ============================================================================
   # TEST - Run Tests
@@ -133,25 +141,33 @@ tasks:
   destroy:
     desc: "Complete project teardown (all steps in order)"
     cmds:
-      - task: destroy:storage
       - task: destroy:services
+      - task: destroy:storage
+      - task: destroy:params
       - task: destroy:infrastructure
       - task: destroy:backend
       - echo "✓ Teardown complete!"
 
+  destroy:services:
+    desc: "Step 1 - Destroy ECS services"
+    cmds:
+      - task: destroy:monitoring
+      - task: destroy:service2
+      - task: destroy:service1
+
   destroy:storage:
-    desc: "Step 1 - Empty ECR repositories and S3 bucket"
+    desc: "Step 2 - Empty ECR repositories and S3 bucket"
     dir: tasks
     cmds:
       - echo "Emptying storage resources..."
       - ./cleanup-storage.sh
 
-  destroy:services:
-    desc: "Step 2-3 - Destroy ECS services"
+  destroy:params:
+    desc: "Step 3 - Delete SSM parameters"
+    dir: tasks
     cmds:
-      - task: destroy:monitoring
-      - task: destroy:service2
-      - task: destroy:service1
+      - echo "Deleting SSM parameters..."
+      - ./cleanup-params.sh
 
   destroy:service1:
     desc: "Destroy Service1"

@@ -18,13 +18,6 @@ ECR_REPO_SERVICE2="${PROJECT}/${ENV}/service2"
 ECR_REPO_GRAFANA="${PROJECT}/${ENV}/grafana"
 S3_BUCKET="${PROJECT}-${ENV}-messages-bucket"
 
-# SSM Parameter paths
-SSM_SERVICE1_AUTH="/${PROJECT}/${ENV}/service1/auth-token"
-SSM_SERVICE1_TAG="/${PROJECT}/${ENV}/service1/image-tag"
-SSM_SERVICE2_TAG="/${PROJECT}/${ENV}/service2/image-tag"
-SSM_GRAFANA_PASSWORD="/${PROJECT}/${ENV}/grafana/admin-password"
-SSM_GRAFANA_TAG="/${PROJECT}/${ENV}/grafana/image-tag"
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -143,31 +136,8 @@ cleanup_s3_bucket() {
     echo -e "${GREEN}Deleted all objects from ${bucket_name}${NC}"
 }
 
-# Function to delete SSM parameter
-cleanup_ssm_parameter() {
-    local param_name=$1
-    echo -e "${YELLOW}Deleting SSM parameter: ${param_name}${NC}"
-
-    # Check if parameter exists and delete it
-    if aws ssm get-parameter \
-        --name "${param_name}" \
-        --region "${REGION}" \
-        --profile "${AWS_PROFILE}" \
-        >/dev/null 2>&1; then
-
-        aws ssm delete-parameter \
-            --name "${param_name}" \
-            --region "${REGION}" \
-            --profile "${AWS_PROFILE}"
-
-        echo -e "${GREEN}Deleted parameter ${param_name}${NC}"
-    else
-        echo -e "${YELLOW}Parameter ${param_name} does not exist, skipping${NC}"
-    fi
-}
-
 # Main execution
-echo -e "${YELLOW}Starting cleanup...${NC}"
+echo -e "${YELLOW}Starting storage cleanup...${NC}"
 echo ""
 
 # Cleanup ECR repositories
@@ -182,27 +152,11 @@ echo -e "${GREEN}=== Cleaning S3 Bucket ===${NC}"
 cleanup_s3_bucket "${S3_BUCKET}"
 echo ""
 
-# Cleanup SSM Parameters
-echo -e "${GREEN}=== Cleaning SSM Parameters ===${NC}"
-cleanup_ssm_parameter "${SSM_SERVICE1_AUTH}"
-cleanup_ssm_parameter "${SSM_SERVICE1_TAG}"
-cleanup_ssm_parameter "${SSM_SERVICE2_TAG}"
-cleanup_ssm_parameter "${SSM_GRAFANA_PASSWORD}"
-cleanup_ssm_parameter "${SSM_GRAFANA_TAG}"
-echo ""
-
-echo -e "${GREEN}=== Cleanup Complete ===${NC}"
+echo -e "${GREEN}=== Storage Cleanup Complete ===${NC}"
 echo ""
 echo -e "${YELLOW}Summary:${NC}"
 echo "✓ ECR repository ${ECR_REPO_SERVICE1} emptied"
 echo "✓ ECR repository ${ECR_REPO_SERVICE2} emptied"
 echo "✓ ECR repository ${ECR_REPO_GRAFANA} emptied"
 echo "✓ S3 bucket ${S3_BUCKET} emptied"
-echo "✓ SSM parameters deleted:"
-echo "  - ${SSM_SERVICE1_AUTH}"
-echo "  - ${SSM_SERVICE1_TAG}"
-echo "  - ${SSM_SERVICE2_TAG}"
-echo "  - ${SSM_GRAFANA_PASSWORD}"
-echo "  - ${SSM_GRAFANA_TAG}"
 echo ""
-echo -e "${GREEN}You can now safely run 'terraform destroy'${NC}"

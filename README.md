@@ -391,6 +391,63 @@ open http://<ALB-DNS>/grafana
 
 ## CI/CD Pipeline
 
+### GitHub Workflows Overview
+
+This project uses **GitHub Actions** for automated CI/CD. All workflows are located in [`.github/workflows/`](.github/workflows/).
+
+#### Available Workflows
+
+| Workflow | Trigger | Purpose | How to Run |
+|----------|---------|---------|------------|
+| **CI Pipeline** | Push to `main`, PR, Manual | Build and test services | GitHub Actions UI → "CI Pipeline" → Run workflow |
+| **CD Pipeline** | CI completion, Manual | Deploy services to ECS | GitHub Actions UI → "CD Pipeline" → Run workflow → Select services |
+| **Build and Deploy Grafana** | Manual | Build Grafana image and deploy monitoring | GitHub Actions UI → "Build and Deploy Grafana" → Run workflow |
+
+#### Running Workflows via GitHub UI
+
+**To build and deploy services:**
+
+1. Go to your repository on GitHub
+2. Click the **"Actions"** tab
+3. Select **"CI Pipeline"** workflow from the left sidebar
+4. Click **"Run workflow"** button (top right)
+5. Configure options:
+   - **Services**: Select `all`, `service1`, `service2`, or leave empty for auto-detection
+   - **Run tests**: Check to run unit tests before building
+   - **Trigger CD**: Check to automatically deploy after building
+6. Click **"Run workflow"**
+
+**To deploy Grafana monitoring:**
+
+1. Go to **Actions** tab
+2. Select **"Build and Deploy Grafana"** workflow
+3. Click **"Run workflow"**
+4. (Optional) Enter admin password or leave empty to use existing SSM value
+5. Click **"Run workflow"**
+
+The workflows will automatically:
+- Build Docker images
+- Push to Amazon ECR
+- Store image tags in SSM Parameter Store
+- Deploy to ECS (if triggered)
+- Wait for services to stabilize
+
+#### Workflow Inputs
+
+**CI Pipeline Inputs:**
+- `services` - Services to build (`all`, `service1`, `service2`, or empty for auto-detect)
+- `run_tests` - Whether to run unit tests (`true`/`false`)
+- `trigger_cd` - Auto-trigger CD pipeline after build (`true`/`false`)
+
+**CD Pipeline Inputs:**
+- `services` - Services to deploy (`all`, `service1`, `service2`)
+- `project_name` - Project name (default: `ha-roy-develeap`)
+- `environment` - Environment to deploy to (default: `dev`)
+
+**Build and Deploy Grafana Inputs:**
+- `admin_password` - Grafana admin password (stored in SSM)
+- `image_tag` - Custom image tag (default: git commit SHA)
+
 ### Pipeline Architecture
 
 ```
