@@ -3,6 +3,7 @@ apiVersion: 1
 datasources:
   - name: CloudWatch
     type: cloudwatch
+    uid: cloudwatch
     access: proxy
     jsonData:
       authType: default  # Uses IAM role from ECS task
