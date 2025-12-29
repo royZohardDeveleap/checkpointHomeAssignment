@@ -25,21 +25,36 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
+                   ┌──────────────────────┐
+                   │ Public Subnets (2 AZs)│
+                   └──────────────────────┘
+                              │
 ┌─────────────────────────────────────────────────────────────────┐
 │                   Application Load Balancer                      │
 │              /service1/* → Service1 Target Group                 │
 │              /grafana/*  → Grafana Target Group                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
-           ┌──────────────────┼──────────────────┐
-           ▼                  ▼                  ▼
-    ┌────────────┐    ┌────────────┐    ┌────────────┐
-    │  Service1  │    │  Service2  │    │  Grafana   │
-    │  (Fargate) │    │  (Fargate) │    │  (Fargate) │
-    │            │    │            │    │            │
-    │  API       │    │  Worker    │    │ Monitoring │
-    │  Endpoint  │    │  Service   │    │ Dashboard  │
-    └────────────┘    └────────────┘    └────────────┘
+                              ▼
+                   ┌──────────────────────┐
+                   │ Private Subnets (2 AZs)│
+                   └──────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────────┐
+│               ECS Cluster (EC2 Launch Type)                      │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │        Auto Scaling Group (t3.micro instances)          │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │    │
+│  │  │  EC2 Instance│  │  EC2 Instance│  │  EC2 Instance│ │    │
+│  │  │  ┌─────────┐ │  │  ┌─────────┐ │  │  ┌─────────┐ │ │    │
+│  │  │  │Service1 │ │  │  │Service2 │ │  │  │ Grafana │ │ │    │
+│  │  │  │Container│ │  │  │Container│ │  │  │Container│ │ │    │
+│  │  │  └─────────┘ │  │  └─────────┘ │  │  └─────────┘ │ │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘ │    │
+│  │       Capacity Provider: Managed Scaling               │    │
+│  └────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
            │                  │
            ▼                  ▼
     ┌────────────────────────────┐
@@ -128,15 +143,18 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 
 ### Infrastructure (Terraform)
 
-- **VPC** - Multi-AZ networking with public subnets
-- **ECS Cluster** - Fargate-based container orchestration
+- **VPC** - Multi-AZ networking with public and private subnets
+- **ECS Cluster** - EC2-based container orchestration with Auto Scaling
+- **EC2 Auto Scaling Group** - Self-managed container instances (t3.micro)
+- **ECS Capacity Provider** - Managed scaling for container instances
 - **Application Load Balancer** - HTTP routing and health checks
 - **SQS Queue** - Message queue for async communication
 - **S3 Bucket** - Object storage for processed messages
 - **ECR Repositories** - Docker image registry
 - **CloudWatch Logs** - Centralized logging
-- **IAM Roles** - Least-privilege access control
+- **IAM Roles** - Least-privilege access control (instance role + task execution role)
 - **SSM Parameter Store** - Secure configuration management
+- **Launch Template** - EC2 instance configuration with ECS-optimized AMI
 
 ### Services
 
@@ -260,14 +278,18 @@ terraform apply
 ```
 
 Resources created:
-- VPC with 2 public subnets across AZs
-- ECS Fargate cluster
-- Application Load Balancer
+- VPC with 2 public and 2 private subnets across AZs
+- ECS Cluster (EC2 Launch Type)
+- Auto Scaling Group with ECS-optimized EC2 instances
+- ECS Capacity Provider with managed scaling
+- Launch Template for EC2 instances
+- Application Load Balancer with target groups
 - SQS queue
 - S3 bucket for message storage
 - 3 ECR repositories (service1, service2, grafana)
 - CloudWatch log groups
-- IAM roles and policies
+- IAM roles (EC2 instance role + task execution role) and policies
+- Security groups for ALB and ECS instances
 
 ### Step 3: Create Authentication Token
 
@@ -528,6 +550,35 @@ aws ecs describe-services \
   --profile checkpoint
 ```
 
+### EC2 Instance Access
+
+Since this uses EC2 launch type, you can connect to the container instances:
+
+```bash
+# List ECS container instances
+aws ecs list-container-instances \
+  --cluster ha-roy-develeap-dev-cluster \
+  --profile checkpoint
+
+# Get EC2 instance IDs
+aws ecs describe-container-instances \
+  --cluster ha-roy-develeap-dev-cluster \
+  --container-instances <CONTAINER-INSTANCE-ARN> \
+  --profile checkpoint \
+  --query 'containerInstances[*].ec2InstanceId'
+
+# Connect via SSM Session Manager (no SSH keys needed)
+aws ssm start-session \
+  --target <EC2-INSTANCE-ID> \
+  --profile checkpoint
+
+# Once connected, you can:
+# - View running containers: docker ps
+# - Check container logs: docker logs <container-id>
+# - Inspect ECS agent: cat /etc/ecs/ecs.config
+# - Monitor resources: top, htop
+```
+
 ## Cleanup
 
 ### Quick Cleanup (Recommended)
@@ -667,12 +718,14 @@ task --list                 # Show all available tasks
 
 ## Architecture Decisions
 
-### Why ECS Fargate?
+### Why ECS with EC2 Launch Type?
 
-- **Serverless containers** - No EC2 instance management
-- **Auto-scaling** - Built-in scaling capabilities
-- **Cost-effective** - Pay only for resources used
-- **Security** - Isolated task execution
+- **Cost control** - More cost-effective than Fargate for long-running services
+- **Instance control** - Direct access to underlying EC2 instances via SSM
+- **Capacity Provider** - ECS-managed scaling of EC2 instances
+- **Resource efficiency** - Multiple containers per instance for better utilization
+- **Flexibility** - Ability to SSH/SSM into instances for debugging
+- **ECS-optimized AMI** - Pre-configured Amazon Linux with Docker and ECS agent
 
 ### Why Application Load Balancer?
 
@@ -715,10 +768,10 @@ task --list                 # Show all available tasks
 Items that would improve this solution:
 
 ### Infrastructure
-- **Better instance types** - t3.small instead of t3.micro for better performance
-- **Bastion host** - Secure access to private resources
-- **NAT Gateway** - Outbound internet for private subnets
-- **VPC Endpoints** - Reduce data transfer costs
+- **Better instance types** - t3.small instead of t3.micro to avoid resource constraints
+- **NAT Gateway** - Outbound internet access for private subnets (currently using IGW only)
+- **VPC Endpoints** - ECR, S3, CloudWatch endpoints to reduce data transfer costs
+- **Multi-region deployment** - Cross-region replication for disaster recovery
 
 ### Security
 - **WAF** - Web Application Firewall for ALB
