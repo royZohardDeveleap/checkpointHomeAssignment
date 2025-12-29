@@ -276,6 +276,8 @@ terraform plan
 terraform apply
 ```
 
+**Important**: To enable Grafana monitoring, ensure `enable_monitoring = true` is set in `terraform.tfvars` (enabled by default). Set to `false` to skip Grafana deployment.
+
 Resources created:
 - VPC with 2 public and 2 private subnets across AZs
 - ECS Cluster (EC2 Launch Type)
@@ -302,6 +304,27 @@ cd tasks
 You'll be prompted to enter a token (or it will generate one). This token is used by Service1 for request authentication.
 
 ### Step 4: Build and Push Docker Images (CI Pipeline)
+
+#### 4a. Build Grafana Image (Required if monitoring enabled)
+
+If `enable_monitoring = true`, build and deploy Grafana with a secure admin password:
+
+```bash
+# Build Grafana with custom admin password
+gh workflow run build-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
+
+# Or use default password (admin/admin - change after first login)
+gh workflow run build-grafana.yaml
+```
+
+This workflow:
+1. Builds Grafana Docker image with pre-configured dashboards
+2. Pushes to ECR
+3. Stores admin password in SSM Parameter Store
+4. Tags with semantic version (e.g., `grafana-v3.1.0`)
+5. Grafana reads password from SSM on startup
+
+#### 4b. Build Application Services
 
 The CI pipeline automatically:
 - Detects changed services
@@ -958,7 +981,6 @@ Items that would improve this solution:
 - **Better instance types** - t3.small instead of t2.micro to prevent resource constraints from blocking new task versions
 - **Multi-region deployment** - Cross-region replication for disaster recovery
 - **Auto Scaling policies** - Scale based on CPU/memory metrics instead of just capacity
-- **Mixed instance types with Spot** - ECS Capacity Provider with mixed On-Demand and Spot instances (e.g., 50% base On-Demand, rest Spot with multiple instance types for availability)
 
 ### Security
 - **WAF** - Web Application Firewall for ALB
@@ -982,7 +1004,7 @@ Items that would improve this solution:
 - **Environment promotion** - Expand pipelines to promote builds between environments (dev → staging → prod)
 - **Zero-downtime deployment strategy** - Blue/Green deployment and Canary releases
 - **Automated rollback** - Detect and revert failures (requires custom business metrics)
-- **Environment parity** - Dev/Staging/Prod consistency
+- **Environment parity** - Use same IaC modules and Docker images across dev/staging/prod with environment-specific scaling via Terraform variables (e.g., dev: 1 instance, prod: 10 instances)
 
 ## Troubleshooting
 
