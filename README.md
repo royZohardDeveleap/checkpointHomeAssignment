@@ -974,9 +974,11 @@ Items that would improve this solution:
 
 ### Application
 - **Event-driven Service2** - SQS event source instead of polling
-- **DLQ** - Dead Letter Queue for failed messages
-- **Message batching** - Process multiple messages at once
-- **Idempotency** - Prevent duplicate processing
+- **DLQ with redrive** - Dead Letter Queue for failed messages with redrive policy to move messages back to source queue after fixing issues
+- **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput
+- **Visibility timeout tuning** - Adjust message visibility timeout based on processing time to prevent duplicate processing
+- **Message delay configuration** - Use delay queues or per-message delay for retry backoff strategies
+- **Idempotency** - Prevent duplicate processing using message deduplication ID (FIFO queues) or application-level idempotency keys
 
 ### DevOps
 - **Environment promotion** - Expand pipelines to promote builds between environments (dev → staging → prod)
