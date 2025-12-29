@@ -67,8 +67,7 @@ jobs:
             --value "${{ steps.generate-password.outputs.password }}" \
             --type "SecureString" \
             --overwrite \
-            --description "Grafana admin password" \
-            --tags "Key=Project,Value=${{ env.PROJECT }}" "Key=Environment,Value=${{ env.ENV }}"
+            --description "Grafana admin password"
 
       - name: Get image tag
         id: image-tag
