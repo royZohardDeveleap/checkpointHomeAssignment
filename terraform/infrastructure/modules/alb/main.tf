@@ -85,8 +85,6 @@ resource "aws_lb_target_group" "service1" {
 
 # Target Group for Grafana
 resource "aws_lb_target_group" "grafana" {
-  count = var.enable_monitoring ? 1 : 0
-
   name        = "${var.project_name}-${var.environment}-grafana-tg"
   port        = 3000
   protocol    = "HTTP"
@@ -134,14 +132,12 @@ resource "aws_lb_listener" "http" {
 
 # Listener Rule for Grafana (path-based routing)
 resource "aws_lb_listener_rule" "grafana" {
-  count = var.enable_monitoring ? 1 : 0
-
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.grafana[0].arn
+    target_group_arn = aws_lb_target_group.grafana.arn
   }
 
   condition {

@@ -96,7 +96,7 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 │   ├── ci-pipeline.yaml        # Continuous Integration pipeline
 │   ├── cd-pipeline.yaml        # Continuous Deployment pipeline
 │   ├── build-service.yaml      # Service build workflow
-│   ├── build-grafana.yaml      # Grafana build workflow
+│   ├── build-deploy-grafana.yaml  # Grafana build and deployment workflow
 │   ├── test-service.yaml       # Service testing workflow
 │   └── deploy-service.yaml     # Service deployment workflow
 │
@@ -132,6 +132,7 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 │   │
 │   ├── service1/             # Service1 ECS deployment
 │   ├── service2/             # Service2 ECS deployment
+│   ├── monitoring/           # Grafana ECS deployment (separate workspace)
 │   ├── setup-backend.sh      # Create Terraform state backend
 │   └── delete-backend.sh     # Delete Terraform state backend
 │
@@ -276,21 +277,21 @@ terraform plan
 terraform apply
 ```
 
-**Important**: To enable Grafana monitoring, ensure `enable_monitoring = true` is set in `terraform.tfvars` (enabled by default). Set to `false` to skip Grafana deployment.
-
 Resources created:
 - VPC with 2 public and 2 private subnets across AZs
 - ECS Cluster (EC2 Launch Type)
 - Auto Scaling Group with ECS-optimized EC2 instances
 - ECS Capacity Provider with managed scaling
 - Launch Template for EC2 instances
-- Application Load Balancer with target groups
+- Application Load Balancer with target groups (including Grafana target group)
 - SQS queue
 - S3 bucket for message storage
 - 3 ECR repositories (service1, service2, grafana)
 - CloudWatch log groups
 - IAM roles (EC2 instance role + task execution role) and policies
 - Security groups for ALB and ECS instances
+
+**Note**: Grafana monitoring service is deployed separately in Step 4a using its own Terraform workspace.
 
 ### Step 3: Create Authentication Token
 
@@ -305,24 +306,27 @@ You'll be prompted to enter a token (or it will generate one). This token is use
 
 ### Step 4: Build and Push Docker Images (CI Pipeline)
 
-#### 4a. Build Grafana Image (Required if monitoring enabled)
+#### 4a. Build and Deploy Grafana (Optional - for monitoring)
 
-If `enable_monitoring = true`, build and deploy Grafana with a secure admin password:
+Build Grafana image and deploy the monitoring service:
 
 ```bash
-# Build Grafana with custom admin password
-gh workflow run build-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
+# Build and deploy Grafana with custom admin password
+gh workflow run build-deploy-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
 
-# Or use default password (admin/admin - change after first login)
-gh workflow run build-grafana.yaml
+# Or use existing password from SSM (if already set)
+gh workflow run build-deploy-grafana.yaml
 ```
 
 This workflow:
-1. Builds Grafana Docker image with pre-configured dashboards
-2. Pushes to ECR
-3. Stores admin password in SSM Parameter Store
-4. Tags with semantic version (e.g., `grafana-v3.1.0`)
-5. Grafana reads password from SSM on startup
+1. Stores/updates admin password in SSM Parameter Store (if provided)
+2. Builds Grafana Docker image with pre-configured dashboards
+3. Pushes image to ECR
+4. Stores image tag in SSM Parameter Store
+5. Deploys Grafana ECS service using Terraform (terraform/monitoring workspace)
+6. Waits for service to become healthy
+
+**Note**: Grafana has its own Terraform workspace ([terraform/monitoring/](terraform/monitoring/)) separate from core infrastructure. This allows independent monitoring updates without touching infrastructure.
 
 #### 4b. Build Application Services
 
@@ -647,28 +651,29 @@ Access Grafana at: `http://<ALB-DNS>/grafana`
 
 **Initial Setup**:
 
-Grafana has a separate build workflow for security (password management):
+Grafana has a separate build and deployment workflow for security (password management) and independent lifecycle:
 
 ```bash
 # Build and deploy Grafana with admin password
-gh workflow run build-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
+gh workflow run build-deploy-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
 
 # Build with custom image tag
-gh workflow run build-grafana.yaml \
+gh workflow run build-deploy-grafana.yaml \
   -f admin_password=<YOUR-SECURE-PASSWORD> \
   -f image_tag=v1.0.0
 
-# Or build with default password (if already set in SSM) and auto-generated tag (git SHA)
-gh workflow run build-grafana.yaml
+# Or build with existing password (if already set in SSM) and auto-generated tag (git SHA)
+gh workflow run build-deploy-grafana.yaml
 ```
 
 The workflow:
-1. Stores admin password securely in SSM Parameter Store (encrypted)
+1. Stores/updates admin password in SSM Parameter Store (if provided)
 2. Builds Grafana Docker image with pre-configured dashboards
 3. Tags image (custom tag or git commit SHA)
 4. Pushes to ECR
 5. Stores image tag in SSM Parameter Store
-6. Grafana reads password from SSM on startup
+6. Deploys Grafana ECS service using Terraform (terraform/monitoring workspace)
+7. Waits for service to become healthy
 
 **Default credentials**: `admin` / `<password-from-SSM>`
 

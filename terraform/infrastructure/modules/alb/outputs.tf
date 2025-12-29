@@ -30,7 +30,7 @@ output "service1_target_group_arn" {
 
 output "grafana_target_group_arn" {
   description = "Grafana target group ARN"
-  value       = var.enable_monitoring ? aws_lb_target_group.grafana[0].arn : null
+  value       = aws_lb_target_group.grafana.arn
 }
 
 output "http_listener_arn" {

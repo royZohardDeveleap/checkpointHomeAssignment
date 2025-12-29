@@ -18,12 +18,6 @@ variable "public_subnet_ids" {
   type        = list(string)
 }
 
-variable "enable_monitoring" {
-  description = "Whether to create Grafana target group and listener rule"
-  type        = bool
-  default     = false
-}
-
 variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

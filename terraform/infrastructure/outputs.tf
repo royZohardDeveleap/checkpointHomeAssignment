@@ -90,7 +90,7 @@ output "ecr_service2_repository_url" {
 
 output "ecr_grafana_repository_url" {
   description = "ECR repository URL for Grafana"
-  value       = var.enable_monitoring ? module.ecr.grafana_repository_url : null
+  value       = module.ecr.grafana_repository_url
 }
 
 # =============================================================================
@@ -120,25 +120,6 @@ output "service1_target_group_arn" {
 output "grafana_target_group_arn" {
   description = "Grafana target group ARN"
   value       = module.alb.grafana_target_group_arn
-}
-
-# =============================================================================
-# MONITORING (GRAFANA) OUTPUTS
-# =============================================================================
-
-output "grafana_service_name" {
-  description = "Grafana ECS service name"
-  value       = var.enable_monitoring ? module.monitoring[0].service_name : null
-}
-
-output "grafana_service_id" {
-  description = "Grafana ECS service ID"
-  value       = var.enable_monitoring ? module.monitoring[0].service_id : null
-}
-
-output "grafana_log_group_name" {
-  description = "Grafana CloudWatch log group name"
-  value       = var.enable_monitoring ? module.monitoring[0].log_group_name : null
 }
 
 # =============================================================================

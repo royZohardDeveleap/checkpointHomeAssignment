@@ -85,6 +85,20 @@ tasks:
       - echo "Image built service2 {{.VERSION}}"
 
   # ============================================================================
+  # DEPLOY - Terraform Deployments
+  # ============================================================================
+
+  deploy:monitoring:
+    desc: "Deploy Grafana monitoring service (terraform/monitoring)"
+    dir: terraform/monitoring
+    cmds:
+      - echo "Deploying Grafana monitoring..."
+      - terraform init
+      - terraform apply -auto-approve
+      - echo "✓ Monitoring deployed"
+      - echo "Note: Grafana image must be built first (gh workflow run build-deploy-grafana.yaml)"
+
+  # ============================================================================
   # TEST - Run Tests
   # ============================================================================
 
@@ -135,6 +149,7 @@ tasks:
   destroy:services:
     desc: "Step 2-3 - Destroy ECS services"
     cmds:
+      - task: destroy:monitoring
       - task: destroy:service2
       - task: destroy:service1
 
@@ -147,6 +162,12 @@ tasks:
   destroy:service2:
     desc: "Destroy Service2"
     dir: terraform/service2
+    cmds:
+      - terraform destroy -auto-approve
+
+  destroy:monitoring:
+    desc: "Destroy Grafana monitoring service"
+    dir: terraform/monitoring
     cmds:
       - terraform destroy -auto-approve
 
@@ -189,6 +210,7 @@ tasks:
           echo "ALB: http://$ALB_DNS"
           echo "Service1: http://$ALB_DNS/service1/"
           echo "Service1 Health: http://$ALB_DNS/service1/health"
+          echo "Grafana: http://$ALB_DNS/grafana"
         else
           echo "Infrastructure not deployed"
         fi

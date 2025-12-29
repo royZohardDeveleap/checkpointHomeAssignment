@@ -59,9 +59,3 @@ variable "enable_vpc_endpoints" {
   default     = true
 }
 
-variable "enable_monitoring" {
-  description = "Enable Grafana monitoring service"
-  type        = bool
-  default     = false
-}
-

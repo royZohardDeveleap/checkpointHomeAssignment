@@ -1,4 +1,4 @@
-name: Build Grafana
+name: Build and Deploy Grafana
 
 on:
   workflow_dispatch:
@@ -25,6 +25,9 @@ jobs:
 
     permissions:
       contents: read
+
+    outputs:
+      image_tag: ${{ steps.image-tag.outputs.tag }}
 
     steps:
       - name: Checkout code
@@ -115,18 +118,76 @@ jobs:
             --overwrite \
             --description "Grafana container image tag"
 
+  # ============================================================================
+  # DEPLOY MONITORING (TERRAFORM)
+  # ============================================================================
+
+  deploy-monitoring:
+    name: Deploy Grafana Service
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: terraform/monitoring
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.0"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Wait for ECS service stability
+        run: |
+          echo "Waiting for Grafana service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.PROJECT }}-${{ env.ENV }}-cluster \
+            --services ${{ env.PROJECT }}-${{ env.ENV }}-grafana \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Get ALB DNS
+        id: alb-info
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName, '${{ env.PROJECT }}-${{ env.ENV }}')].DNSName" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+
       - name: Generate deployment summary
         run: |
-          echo "## Grafana Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Grafana Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image Tag:** ${{ steps.image-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**ECR Repository:** ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}/${{ env.ENV }}/grafana" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Deployed and Healthy" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ needs.build-and-push.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Grafana URL:** http://${{ steps.alb-info.outputs.alb_dns }}/grafana" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### SSM Parameters Created" >> $GITHUB_STEP_SUMMARY
-          echo "- Admin Password: \`/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Image Tag: \`/${{ env.PROJECT }}/${{ env.ENV }}/grafana/image-tag\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Retrieve Admin Password" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Grafana" >> $GITHUB_STEP_SUMMARY
+          echo "1. Open: http://${{ steps.alb-info.outputs.alb_dns }}/grafana" >> $GITHUB_STEP_SUMMARY
+          echo "2. Login with username: \`admin\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Retrieve password from SSM:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "aws ssm get-parameter \\" >> $GITHUB_STEP_SUMMARY
           echo "  --name '/${{ env.PROJECT }}/${{ env.ENV }}/grafana/admin-password' \\" >> $GITHUB_STEP_SUMMARY
@@ -134,13 +195,10 @@ jobs:
           echo "  --query 'Parameter.Value' \\" >> $GITHUB_STEP_SUMMARY
           echo "  --output text" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "Deploy Grafana service using Terraform with the new image tag" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify on failure
         if: failure()
         run: |
-          echo "## ⚠️ Grafana Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "## ⚠️ Grafana Deployment Failed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY

@@ -23,10 +23,6 @@ availability_zones = ["us-east-1a", "us-east-1b"]
 # Enable VPC endpoints (recommended to save ~$65/month vs NAT Gateway)
 enable_vpc_endpoints = true
 
-# Enable Grafana monitoring service
-# This creates the Grafana ECR repository and ALB target group
-enable_monitoring = true
-
 # =============================================================================
 # ECS CLUSTER CONFIGURATION
 # =============================================================================

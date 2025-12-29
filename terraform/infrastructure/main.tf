@@ -58,7 +58,6 @@ module "alb" {
   environment        = var.environment
   vpc_id             = module.networking.vpc_id
   public_subnet_ids  = module.networking.public_subnet_ids
-  enable_monitoring  = var.enable_monitoring
 
   common_tags = local.common_tags
 }
@@ -156,25 +155,13 @@ module "storage_policies" {
 }
 
 # ============================================================================
-# MONITORING (GRAFANA) - Optional
+# MONITORING (GRAFANA)
 # ============================================================================
-
-module "monitoring" {
-  count = var.enable_monitoring ? 1 : 0
-
-  source = "./modules/monitoring"
-
-  project_name            = var.project_name
-  environment             = var.environment
-  cluster_id              = module.ecs_cluster.cluster_id
-  capacity_provider_name  = module.ecs_cluster.capacity_provider_name
-  task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
-
-  grafana_repository_url = module.ecr.grafana_repository_url
-
-  target_group_arn = module.alb.grafana_target_group_arn
-
-  aws_region = var.aws_region
-
-  common_tags = local.common_tags
-}
+# Monitoring is now managed in a separate Terraform workspace at:
+# terraform/monitoring/
+#
+# This decouples monitoring deployment from core infrastructure and allows:
+# - Independent monitoring updates without touching infrastructure
+# - Deploy monitoring only after Grafana image is built
+# - Optional monitoring deployment per environment
+# ============================================================================
