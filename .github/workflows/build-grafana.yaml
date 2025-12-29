@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       admin_password:
-        description: 'Grafana admin password (leave empty to auto-generate)'
+        description: 'Grafana admin password (enter to overwrite current or create new)'
         required: false
         type: string
       image_tag:
