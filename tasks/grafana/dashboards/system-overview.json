@@ -1,6 +1,5 @@
 {
-  "dashboard": {
-    "title": "System Overview",
+  "title": "System Overview",
     "uid": "system-overview",
     "version": 1,
     "timezone": "browser",
@@ -359,5 +358,4 @@
         ]
       }
     ]
-  }
 }

@@ -32,8 +32,17 @@ resource "aws_iam_role_policy" "grafana_cloudwatch" {
           "cloudwatch:DescribeAlarms",
           "cloudwatch:ListMetrics",
           "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListDashboards",
           "logs:DescribeLogGroups",
-          "logs:GetLogEvents"
+          "logs:GetLogEvents",
+          "logs:GetLogGroupFields",
+          "logs:GetLogRecord",
+          "logs:GetQueryResults",
+          "logs:StartQuery",
+          "logs:StopQuery",
+          "ec2:DescribeRegions",
+          "tag:GetResources"
         ]
         Resource = "*"
       }
