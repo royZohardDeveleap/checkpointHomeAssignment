@@ -14,12 +14,12 @@
           "type": "constant",
           "label": "ECS Cluster",
           "current": {
-            "value": "checkpoint-home-assignment-royzohar-dev-cluster"
+            "value": "ha-roy-develeap-dev-cluster"
           },
           "options": [
             {
-              "value": "checkpoint-home-assignment-royzohar-dev-cluster",
-              "text": "checkpoint-home-assignment-royzohar-dev-cluster"
+              "value": "ha-roy-develeap-dev-cluster",
+              "text": "ha-roy-develeap-dev-cluster"
             }
           ]
         },
@@ -28,12 +28,12 @@
           "type": "constant",
           "label": "SQS Queue",
           "current": {
-            "value": "checkpoint-home-assignment-royzohar-dev-queue"
+            "value": "ha-roy-develeap-dev-queue"
           },
           "options": [
             {
-              "value": "checkpoint-home-assignment-royzohar-dev-queue",
-              "text": "checkpoint-home-assignment-royzohar-dev-queue"
+              "value": "ha-roy-develeap-dev-queue",
+              "text": "ha-roy-develeap-dev-queue"
             }
           ]
         },
@@ -42,12 +42,12 @@
           "type": "constant",
           "label": "Service 1",
           "current": {
-            "value": "checkpoint-home-assignment-royzohar-dev-service1"
+            "value": "ha-roy-develeap-dev-service1"
           },
           "options": [
             {
-              "value": "checkpoint-home-assignment-royzohar-dev-service1",
-              "text": "checkpoint-home-assignment-royzohar-dev-service1"
+              "value": "ha-roy-develeap-dev-service1",
+              "text": "ha-roy-develeap-dev-service1"
             }
           ]
         },
@@ -56,12 +56,12 @@
           "type": "constant",
           "label": "Service 2",
           "current": {
-            "value": "checkpoint-home-assignment-royzohar-dev-service2"
+            "value": "ha-roy-develeap-dev-service2"
           },
           "options": [
             {
-              "value": "checkpoint-home-assignment-royzohar-dev-service2",
-              "text": "checkpoint-home-assignment-royzohar-dev-service2"
+              "value": "ha-roy-develeap-dev-service2",
+              "text": "ha-roy-develeap-dev-service2"
             }
           ]
         }
@@ -324,7 +324,7 @@
             "namespace": "AWS/ApplicationELB",
             "metricName": "RequestCount",
             "dimensions": {
-              "LoadBalancer": ["app/checkpoint-home-assignment-royzohar-dev-alb"]
+              "LoadBalancer": ["app/ha-roy-develeap-dev-alb"]
             },
             "statistic": "Sum",
             "period": "60"
@@ -347,7 +347,7 @@
             "namespace": "AWS/ApplicationELB",
             "metricName": "TargetResponseTime",
             "dimensions": {
-              "LoadBalancer": ["app/checkpoint-home-assignment-royzohar-dev-alb"]
+              "LoadBalancer": ["app/ha-roy-develeap-dev-alb"]
             },
             "statistic": "Average",
             "period": "60"
