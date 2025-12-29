@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 CLUSTER_NAME="${CLUSTER_NAME:-ha-roy-develeap-dev-cluster}"
 AWS_REGION=us-east-1
-AWS_PROFILE="checkpoint"
+AWS_PROFILE="${AWS_PROFILE:-checkpoint}"
 INSTANCE_ID=""
 
 # Parse command line arguments

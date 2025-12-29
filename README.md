@@ -136,7 +136,6 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 │   └── delete-backend.sh     # Delete Terraform state backend
 │
 ├── Taskfile.yml              # Task automation (similar to Makefile)
-├── Steps                     # Quick reference guide
 └── README.md                 # This file
 ```
 
@@ -227,11 +226,6 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 The fastest way to get started:
 
 ```bash
-# Install Task runner if you haven't already
-brew install go-task/tap/go-task  # macOS
-# or
-sudo snap install task --classic  # Linux
-
 # Optional: Configure AWS profile in Taskfile.yml if using named profiles
 # Edit the AWS_PROFILE variable in Taskfile.yml (default: checkpoint)
 # Or remove --profile flags from Taskfile.yml if using default AWS credentials
@@ -314,8 +308,10 @@ The CI pipeline automatically:
 - Runs unit tests (on PRs)
 - Builds Docker images
 - Pushes to ECR
-- Tags images with git SHA
-- Triggers CD pipeline
+- Tags images with semantic version (e.g., `service1-v1.2.3`)
+- Creates git tags
+- Stores image tags in SSM Parameter Store
+- Triggers CD pipeline via repository_dispatch
 
 **Trigger CI manually:**
 ```bash
@@ -422,8 +418,38 @@ open http://<ALB-DNS>/grafana
 - **Dual triggers** - `repository_dispatch` (automated) + `workflow_dispatch` (manual)
 - **Service selection** - Deploy specific services or all
 - **Terraform-based** - Infrastructure as Code deployment
+- **SSM-based versioning** - Reads image tags from Parameter Store
 - **Health checks** - Waits for ECS service stability
 - **Rollback ready** - Previous task definitions retained
+
+### How Image Versioning Works
+
+The system uses SSM Parameter Store as the source of truth for image tags:
+
+**CI Pipeline (Build):**
+1. Builds Docker image with semantic version tag (e.g., `1.2.3`)
+2. Pushes image to ECR: `<account>.dkr.ecr.us-east-1.amazonaws.com/ha-roy-develeap/dev/service1:1.2.3`
+3. Stores tag in SSM: `/ha-roy-develeap/dev/service1/image-tag` = `1.2.3`
+
+**CD Pipeline (Deploy):**
+1. Terraform reads image tag from SSM Parameter Store
+2. Creates/updates ECS task definition with the image URI
+3. Updates ECS service with new task definition
+4. ECS pulls the correct image version from ECR
+
+This decouples build from deployment - you can:
+- Deploy any previously built version by updating SSM parameter
+- Roll back by changing SSM parameter to previous version
+- Deploy same version across multiple environments
+
+**SSM Parameters:**
+```
+/ha-roy-develeap/dev/service1/image-tag      # Service1 version
+/ha-roy-develeap/dev/service2/image-tag      # Service2 version
+/ha-roy-develeap/dev/grafana/image-tag       # Grafana version
+/ha-roy-develeap/dev/service1/auth-token     # Service1 auth token
+/ha-roy-develeap/dev/grafana/admin-password  # Grafana admin password
+```
 
 ### Triggering Methods
 
@@ -448,7 +474,25 @@ gh workflow run cd-pipeline.yaml \
   -f environment=dev
 ```
 
-**4. Pull Request (Tests Only)**
+**4. Manual Rollback (Change SSM Parameter)**
+```bash
+# View current version
+aws ssm get-parameter \
+  --name /ha-roy-develeap/dev/service1/image-tag \
+  --query 'Parameter.Value' \
+  --output text
+
+# Rollback to previous version
+aws ssm put-parameter \
+  --name /ha-roy-develeap/dev/service1/image-tag \
+  --value "1.2.2" \
+  --overwrite
+
+# Trigger deployment with rollback version
+gh workflow run cd-pipeline.yaml -f services=service1
+```
+
+**5. Pull Request (Tests Only)**
 ```bash
 git checkout -b feature/new-feature
 git push origin feature/new-feature
@@ -586,15 +630,22 @@ Grafana has a separate build workflow for security (password management):
 # Build and deploy Grafana with admin password
 gh workflow run build-grafana.yaml -f admin_password=<YOUR-SECURE-PASSWORD>
 
-# Or build with default password (if already set in SSM)
+# Build with custom image tag
+gh workflow run build-grafana.yaml \
+  -f admin_password=<YOUR-SECURE-PASSWORD> \
+  -f image_tag=v1.0.0
+
+# Or build with default password (if already set in SSM) and auto-generated tag (git SHA)
 gh workflow run build-grafana.yaml
 ```
 
 The workflow:
 1. Stores admin password securely in SSM Parameter Store (encrypted)
 2. Builds Grafana Docker image with pre-configured dashboards
-3. Pushes to ECR
-4. Grafana reads password from SSM on startup
+3. Tags image (custom tag or git commit SHA)
+4. Pushes to ECR
+5. Stores image tag in SSM Parameter Store
+6. Grafana reads password from SSM on startup
 
 **Default credentials**: `admin` / `<password-from-SSM>`
 
@@ -873,10 +924,16 @@ task --list                 # Show all available tasks
 
 ### Why SSM Parameter Store?
 
-- **Secure** - Encrypted at rest with KMS
+- **Secure** - Encrypted at rest with KMS (SecureString for passwords)
 - **Versioned** - Parameter history tracking
 - **IAM integrated** - Fine-grained access control
 - **No cost** - Standard parameters are free
+- **Decoupled deployments** - Separates image building from deployment
+  - Build once, deploy many times
+  - Easy rollbacks by changing parameter value
+  - Deploy different versions to different environments
+  - Terraform reads current version dynamically
+- **Single source of truth** - All deployment configs in one place
 
 ### Why Repository Dispatch?
 
@@ -898,22 +955,22 @@ task --list                 # Show all available tasks
 Items that would improve this solution:
 
 ### Infrastructure
-- **Better instance types** - t3.small instead of t3.micro to avoid resource constraints
-- **NAT Gateway** - Outbound internet access for private subnets (currently using IGW only)
-- **VPC Endpoints** - ECR, S3, CloudWatch endpoints to reduce data transfer costs
+- **Better instance types** - t3.small instead of t2.micro to prevent resource constraints from blocking new task versions
 - **Multi-region deployment** - Cross-region replication for disaster recovery
+- **Auto Scaling policies** - Scale based on CPU/memory metrics instead of just capacity
+- **Spot instances** - Cost optimization with mixed instance types
 
 ### Security
 - **WAF** - Web Application Firewall for ALB
-- **Secrets rotation** - Automated credential rotation
-- **KMS encryption** - Customer-managed encryption keys
-- **Network isolation** - Private subnets for services
+- **Secrets rotation** - Automated credential rotation via Lambda
+- **KMS encryption** - Customer-managed encryption keys for S3/SQS
+- **Network ACLs** - Additional network layer security
 
 ### Monitoring
-- **CloudWatch Dashboards** - Native AWS monitoring
-- **CloudWatch Alarms** - Automated alerting
-- **X-Ray tracing** - Distributed request tracing
-- **Metrics enrichment** - Custom business metrics
+- **Custom business metrics** - Application-level KPIs (messages processed, processing time, error rates, queue depth trends)
+- **CI/CD pipeline monitoring** - Build success rates, deployment frequency, lead time for changes, MTTR
+- **Cost monitoring** - Track AWS spend per service and resource
+- **SLO/SLA tracking** - Service level objectives with automated alerting
 
 ### Application
 - **Event-driven Service2** - SQS event source instead of polling
@@ -922,9 +979,9 @@ Items that would improve this solution:
 - **Idempotency** - Prevent duplicate processing
 
 ### DevOps
-- **Blue/Green deployment** - Zero-downtime deployments
-- **Canary releases** - Gradual rollout strategy
-- **Automated rollback** - Detect and revert failures
+- **Environment promotion** - Expand pipelines to promote builds between environments (dev → staging → prod)
+- **Zero-downtime deployment strategy** - Blue/Green deployment and Canary releases
+- **Automated rollback** - Detect and revert failures (requires custom business metrics)
 - **Environment parity** - Dev/Staging/Prod consistency
 
 ## Troubleshooting
@@ -973,6 +1030,38 @@ task logs:service2
 
 # Verify S3 bucket permissions
 aws s3 ls s3://ha-roy-develeap-dev-storage/
+```
+
+### Wrong version deployed
+
+```bash
+# Check current image tag in SSM
+aws ssm get-parameter \
+  --name /ha-roy-develeap/dev/service1/image-tag \
+  --query 'Parameter.Value' \
+  --output text
+
+# Check running task definition
+aws ecs describe-services \
+  --cluster ha-roy-develeap-dev-cluster \
+  --services ha-roy-develeap-dev-service1 \
+  --query 'services[0].taskDefinition'
+
+# View task definition details
+aws ecs describe-task-definition \
+  --task-definition <TASK-DEF-ARN> \
+  --query 'taskDefinition.containerDefinitions[0].image'
+
+# List available git tags
+git tag -l "service1-v*"
+
+# Update SSM to desired version and redeploy
+aws ssm put-parameter \
+  --name /ha-roy-develeap/dev/service1/image-tag \
+  --value "1.2.3" \
+  --overwrite
+
+gh workflow run cd-pipeline.yaml -f services=service1
 ```
 
 ## Contributing
