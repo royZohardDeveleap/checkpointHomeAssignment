@@ -958,19 +958,16 @@ Items that would improve this solution:
 - **Better instance types** - t3.small instead of t2.micro to prevent resource constraints from blocking new task versions
 - **Multi-region deployment** - Cross-region replication for disaster recovery
 - **Auto Scaling policies** - Scale based on CPU/memory metrics instead of just capacity
-- **Spot instances** - Cost optimization with mixed instance types
+- **Mixed instance types with Spot** - ECS Capacity Provider with mixed On-Demand and Spot instances (e.g., 50% base On-Demand, rest Spot with multiple instance types for availability)
 
 ### Security
 - **WAF** - Web Application Firewall for ALB
-- **Secrets rotation** - Automated credential rotation via Lambda
-- **KMS encryption** - Customer-managed encryption keys for S3/SQS
+- **HTTPS for ALB** - Configure SSL/TLS certificate via ACM, enforce HTTPS redirect, add to Route53 public hosted zone as alias record or add as CNAME record to domain purchased from 3rd party domain provider
 - **Network ACLs** - Additional network layer security
 
 ### Monitoring
-- **Custom business metrics** - Application-level KPIs (messages processed, processing time, error rates, queue depth trends)
+- **Custom business metrics** - Application-level KPIs (messages processed, processing time, error rates, queue depth trends) emitted to CloudWatch for operational insights
 - **CI/CD pipeline monitoring** - Build success rates, deployment frequency, lead time for changes, MTTR
-- **Cost monitoring** - Track AWS spend per service and resource
-- **SLO/SLA tracking** - Service level objectives with automated alerting
 
 ### Application
 - **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
