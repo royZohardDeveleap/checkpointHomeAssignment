@@ -55,18 +55,18 @@ A production-ready microservices architecture deployed on AWS ECS Fargate with a
 │  │       Capacity Provider: Managed Scaling               │    │
 │  └────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
+           │                  │                    │
+           ▼                  ▼                    ▼
+    ┌────────────┐    ┌────────────┐      ┌──────────────┐
+    │VPC Endpoint│    │VPC Endpoint│      │VPC Endpoint  │
+    │  (SQS)     │    │   (S3)     │      │(SSM/Logs/ECR)│
+    └────────────┘    └────────────┘      └──────────────┘
            │                  │
            ▼                  ▼
-    ┌────────────────────────────┐
-    │      SQS Queue             │
-    │  (Message Broker)          │
-    └────────────────────────────┘
-                     │
-                     ▼
-              ┌────────────┐
-              │ S3 Bucket  │
-              │  (Storage) │
-              └────────────┘
+    ┌────────────┐      ┌────────────┐
+    │ SQS Queue  │      │ S3 Bucket  │
+    │ (Messages) │      │ (Storage)  │
+    └────────────┘      └────────────┘
 ```
 
 ### Service Flow
