@@ -1,12 +1,6 @@
 name: Build Grafana
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'tasks/grafana/**'
-
   workflow_dispatch:
     inputs:
       admin_password:
