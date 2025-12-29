@@ -96,7 +96,7 @@ tasks:
       - terraform init
       - terraform apply -auto-approve
       - echo "✓ Monitoring deployed"
-      - echo "Note: Grafana image must be built first (gh workflow run build-deploy-grafana.yaml)"
+      - echo "Note Grafana image must be built first (gh workflow run build-deploy-grafana.yaml)"
 
   # ============================================================================
   # TEST - Run Tests

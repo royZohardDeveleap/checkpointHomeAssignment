@@ -10,75 +10,119 @@
       "list": [
         {
           "name": "cluster_name",
-          "type": "custom",
+          "type": "query",
           "label": "ECS Cluster",
           "hide": 0,
-          "query": "ha-roy-develeap-dev-cluster",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "query": {
+            "queryType": "dimensionValues",
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensionKey": "ClusterName",
+            "region": "default"
+          },
           "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-cluster",
             "text": "ha-roy-develeap-dev-cluster"
-          },
-          "options": [
-            {
-              "value": "ha-roy-develeap-dev-cluster",
-              "text": "ha-roy-develeap-dev-cluster"
-            }
-          ]
+          }
         },
         {
           "name": "queue_name",
-          "type": "custom",
+          "type": "query",
           "label": "SQS Queue",
           "hide": 0,
-          "query": "ha-roy-develeap-dev-queue",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "query": {
+            "queryType": "dimensionValues",
+            "namespace": "AWS/SQS",
+            "metricName": "ApproximateNumberOfMessagesVisible",
+            "dimensionKey": "QueueName",
+            "region": "default"
+          },
           "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-queue",
             "text": "ha-roy-develeap-dev-queue"
-          },
-          "options": [
-            {
-              "value": "ha-roy-develeap-dev-queue",
-              "text": "ha-roy-develeap-dev-queue"
-            }
-          ]
+          }
         },
         {
           "name": "service1_name",
-          "type": "custom",
+          "type": "query",
           "label": "Service 1",
           "hide": 0,
-          "query": "ha-roy-develeap-dev-service1",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "query": {
+            "queryType": "dimensionValues",
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensionKey": "ServiceName",
+            "dimensionFilters": {
+              "ClusterName": "$cluster_name"
+            },
+            "region": "default"
+          },
           "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-service1",
             "text": "ha-roy-develeap-dev-service1"
-          },
-          "options": [
-            {
-              "value": "ha-roy-develeap-dev-service1",
-              "text": "ha-roy-develeap-dev-service1"
-            }
-          ]
+          }
         },
         {
           "name": "service2_name",
-          "type": "custom",
+          "type": "query",
           "label": "Service 2",
           "hide": 0,
-          "query": "ha-roy-develeap-dev-service2",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "query": {
+            "queryType": "dimensionValues",
+            "namespace": "AWS/ECS",
+            "metricName": "CPUUtilization",
+            "dimensionKey": "ServiceName",
+            "dimensionFilters": {
+              "ClusterName": "$cluster_name"
+            },
+            "region": "default"
+          },
           "refresh": 1,
           "current": {
             "value": "ha-roy-develeap-dev-service2",
             "text": "ha-roy-develeap-dev-service2"
+          }
+        },
+        {
+          "name": "load_balancer",
+          "type": "query",
+          "label": "Load Balancer",
+          "hide": 0,
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
           },
-          "options": [
-            {
-              "value": "ha-roy-develeap-dev-service2",
-              "text": "ha-roy-develeap-dev-service2"
-            }
-          ]
+          "query": {
+            "queryType": "dimensionValues",
+            "namespace": "AWS/ApplicationELB",
+            "metricName": "RequestCount",
+            "dimensionKey": "LoadBalancer",
+            "region": "default"
+          },
+          "refresh": 1,
+          "current": {
+            "value": "app/ha-roy-develeap-dev-alb/737d25307ded1cc0",
+            "text": "app/ha-roy-develeap-dev-alb/737d25307ded1cc0"
+          }
         }
       ]
     },
@@ -94,7 +138,7 @@
             "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
             "namespace": "AWS/ECS",
             "metricName": "CPUUtilization",
-            "dimensions": {"ClusterName": ["ha-roy-develeap-dev-cluster"]},
+            "dimensions": {"ClusterName": "$cluster_name"},
             "statistic": "Average",
             "period": "60",
             "queryMode": "Metrics",
@@ -120,7 +164,7 @@
             "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
             "namespace": "AWS/ECS",
             "metricName": "MemoryUtilization",
-            "dimensions": {"ClusterName": ["ha-roy-develeap-dev-cluster"]},
+            "dimensions": {"ClusterName": "$cluster_name"},
             "statistic": "Average",
             "period": "60",
             "queryMode": "Metrics",
@@ -147,8 +191,8 @@
             "namespace": "AWS/ECS",
             "metricName": "CPUUtilization",
             "dimensions": {
-              "ServiceName": ["ha-roy-develeap-dev-service1"],
-              "ClusterName": ["ha-roy-develeap-dev-cluster"]
+              "ServiceName": "$service1_name",
+              "ClusterName": "$cluster_name"
             },
             "statistic": "Average",
             "period": "60",
@@ -175,8 +219,8 @@
             "namespace": "AWS/ECS",
             "metricName": "MemoryUtilization",
             "dimensions": {
-              "ServiceName": ["ha-roy-develeap-dev-service1"],
-              "ClusterName": ["ha-roy-develeap-dev-cluster"]
+              "ServiceName": "$service1_name",
+              "ClusterName": "$cluster_name"
             },
             "statistic": "Average",
             "period": "60",
@@ -203,8 +247,8 @@
             "namespace": "AWS/ECS",
             "metricName": "CPUUtilization",
             "dimensions": {
-              "ServiceName": ["ha-roy-develeap-dev-service2"],
-              "ClusterName": ["ha-roy-develeap-dev-cluster"]
+              "ServiceName": "$service2_name",
+              "ClusterName": "$cluster_name"
             },
             "statistic": "Average",
             "period": "60",
@@ -231,8 +275,8 @@
             "namespace": "AWS/ECS",
             "metricName": "MemoryUtilization",
             "dimensions": {
-              "ServiceName": ["ha-roy-develeap-dev-service2"],
-              "ClusterName": ["ha-roy-develeap-dev-cluster"]
+              "ServiceName": "$service2_name",
+              "ClusterName": "$cluster_name"
             },
             "statistic": "Average",
             "period": "60",
@@ -258,7 +302,7 @@
             "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
             "namespace": "AWS/SQS",
             "metricName": "ApproximateNumberOfMessagesVisible",
-            "dimensions": {"QueueName": ["ha-roy-develeap-dev-queue"]},
+            "dimensions": {"QueueName": "$queue_name"},
             "statistic": "Average",
             "period": "60",
             "queryMode": "Metrics",
@@ -283,7 +327,7 @@
             "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
             "namespace": "AWS/SQS",
             "metricName": "ApproximateNumberOfMessagesNotVisible",
-            "dimensions": {"QueueName": ["ha-roy-develeap-dev-queue"]},
+            "dimensions": {"QueueName": "$queue_name"},
             "statistic": "Average",
             "period": "60",
             "queryMode": "Metrics",
@@ -308,7 +352,7 @@
             "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
             "namespace": "AWS/SQS",
             "metricName": "ApproximateAgeOfOldestMessage",
-            "dimensions": {"QueueName": ["ha-roy-develeap-dev-queue"]},
+            "dimensions": {"QueueName": "$queue_name"},
             "statistic": "Maximum",
             "period": "60",
             "queryMode": "Metrics",
@@ -346,7 +390,7 @@
             "namespace": "AWS/ApplicationELB",
             "metricName": "RequestCount",
             "dimensions": {
-              "LoadBalancer": "app/ha-roy-develeap-dev-alb/737d25307ded1cc0"
+              "LoadBalancer": "$load_balancer"
             },
             "statistic": "Sum",
             "period": "60",
@@ -373,7 +417,7 @@
             "namespace": "AWS/ApplicationELB",
             "metricName": "TargetResponseTime",
             "dimensions": {
-              "LoadBalancer": "app/ha-roy-develeap-dev-alb/737d25307ded1cc0"
+              "LoadBalancer": "$load_balancer"
             },
             "statistic": "Average",
             "period": "60",
