@@ -1121,14 +1121,13 @@ Items that would improve this solution:
 
 ### Application
 - **Long polling for SQS** - Increase `WaitTimeSeconds` to 20 seconds in current implementation to reduce empty receives and API costs (currently using short polling with 10-second sleep intervals)
-- **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
-- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe is triggered by mesage entering the SQS queue and and target is an an Service2 ECS task with message as input via containerOverrides environment variables for the service to process and delete from the queue
-- **Event-driven Service2 (Option 3: EventBridge Pipes + VPC Lattice)** - Expose a API endpoint for Service2 via VPC Lattice; refactor the source code to run an app that has an API webhook instead of the polling loop; EventBridge Pipe is triggered by a message entering the SQS queue and the target is an API destination of the VPC Lattice service with a resource gateway deployed into the VPC to give the EventBridge Pipe access to it. The pipe sends a webhook with the message as the payload for the service to process and delete from the queue
-- **DLQ with redrive** - Dead Letter Queue for failed messages with redrive policy to move messages back to source queue after fixing issues
+- **DLQ with redrive** - Dead Letter Queue for failed messages to inspect what went wrong
 - **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput in current polling implementation
 - **Visibility timeout tuning** - Adjust message visibility timeout based on processing time to prevent duplicate processing
 - **Message delay configuration** - Use delay queues or per-message delay for retry backoff strategies
-- **Idempotency** - Prevent duplicate processing using message deduplication ID (FIFO queues) or application-level idempotency keys
+- **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
+- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe is triggered by mesage entering the SQS queue and and target is an an Service2 ECS task with message as input via containerOverrides environment variables for the service to process and delete from the queue
+- **Event-driven Service2 (Option 3: EventBridge Pipes + VPC Lattice)** - Expose a API endpoint for Service2 via VPC Lattice; refactor the source code to run an app that has an API webhook instead of the polling loop; EventBridge Pipe is triggered by a message entering the SQS queue and the target is an API destination of the VPC Lattice service with a resource gateway deployed into the VPC to give the EventBridge Pipe access to it. The pipe sends a webhook with the message as the payload for the service to process and delete from the queue
 
 ### DevOps
 - **Environment promotion** - Expand pipelines to promote builds between environments (dev → staging → prod)
