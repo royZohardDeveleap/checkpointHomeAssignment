@@ -984,41 +984,106 @@ task --list                 # Show all available tasks
 
 ## Architecture Decisions
 
-### Why ECS with EC2 Launch Type?
+### Why VPC Endpoints?
 
-- **Cost control** - More cost-effective than Fargate for long-running services
-- **Instance control** - Direct access to underlying EC2 instances via SSM
-- **Capacity Provider** - ECS-managed scaling of EC2 instances
-- **Resource efficiency** - Multiple containers per instance for better utilization
-- **Flexibility** - Ability to SSH/SSM into instances for debugging
-- **ECS-optimized AMI** - Pre-configured Amazon Linux with Docker and ECS agent
+VPC Endpoints enable private connectivity between the VPC and AWS services without requiring internet access:
 
-### Why Application Load Balancer?
+- **S3 Gateway Endpoint** - Cost-free, allows ECS tasks to access ECR and S3 without NAT Gateway charges
+- **SQS Interface Endpoint** - Private access to SQS queue from ECS tasks in private subnets
+- **ECR Interface Endpoints** - Secure container image pulls without internet gateway (ecr.api, ecr.dkr)
+- **CloudWatch Logs Endpoint** - Private log streaming from containers
+- **SSM Endpoints** - Secure parameter access and EC2 instance management (ssm, ssmmessages, ec2messages)
+- **Security benefits** - Traffic never leaves AWS network, reduces attack surface
+- **No NAT Gateway needed** - Significant cost savings (~$32/month per NAT Gateway)
+- **Better performance** - Lower latency for AWS service calls
+- **Compliance** - Meets data residency requirements by keeping traffic within AWS backbone
 
-- **Path-based routing** - `/service1/*`, `/grafana/*`
-- **Health checks** - Automatic unhealthy target removal
-- **SSL/TLS termination** - Centralized certificate management
-- **High availability** - Multi-AZ deployment
+### Why Resource Policies on S3 and SQS?
 
-### Why SQS for Message Queue?
+Resource policies provide an additional layer of security using defense-in-depth:
 
-- **Fully managed** - No infrastructure to manage
-- **Reliable** - Message durability and delivery guarantees
-- **Scalable** - Handles any message volume
-- **Decoupling** - Services operate independently
+**S3 Bucket Policy:**
+- **Principle of least privilege** - Restricts access to only service2 task role
+- **Defense in depth** - Even if IAM role is compromised, bucket policy limits access
+- **Explicit deny for unauthorized principals** - Prevents accidental misconfigurations
+- **Audit trail** - CloudTrail logs show both IAM and resource policy evaluations
+- **VPC Endpoint enforcement** - Can restrict access to only come through VPC endpoint
+
+**SQS Queue Policy:**
+- **Service isolation** - Service1 can only send messages, Service2 can only receive/delete
+- **Prevents cross-service access** - Service1 can't accidentally consume from queue
+- **Cross-account protection** - Blocks unauthorized AWS accounts
+- **VPC endpoint enforcement** - Ensures queue access only from within VPC
+
+**Combined IAM + Resource Policies:**
+```
+Access Granted = (IAM Role Allows) AND (Resource Policy Allows)
+```
+Both must allow the action, providing dual authorization checks.
 
 ### Why SSM Parameter Store?
 
-- **Secure** - Encrypted at rest with KMS (SecureString for passwords)
-- **Versioned** - Parameter history tracking
-- **IAM integrated** - Fine-grained access control
-- **No cost** - Standard parameters are free
-- **Decoupled deployments** - Separates image building from deployment
-  - Build once, deploy many times
-  - Easy rollbacks by changing parameter value
-  - Deploy different versions to different environments
-  - Terraform reads current version dynamically
-- **Single source of truth** - All deployment configs in one place
+SSM Parameter Store serves multiple critical functions in this architecture:
+
+**Configuration Management:**
+- **Image version control** - Stores Docker image tags independently from Terraform state
+- **Secrets management** - Securely stores authentication tokens and passwords
+- **Version history** - Parameter Store maintains full history for rollback
+- **Decoupled deployments** - Build once, deploy many times by changing parameter value
+
+**Security Benefits:**
+- **Encryption at rest** - SecureString parameters encrypted with KMS
+- **IAM integration** - Fine-grained access control per parameter
+- **Audit logging** - CloudTrail tracks all parameter access
+- **No plaintext secrets** - Sensitive values never in Terraform code or Git
+
+**Operational Advantages:**
+- **No cost** - Standard parameters are free (up to 10,000)
+- **Easy rollback** - Change parameter to previous version, redeploy service
+- **Environment promotion** - Same image tag works across dev/staging/prod
+- **GitOps friendly** - Terraform references parameters, not hardcoded values
+
+### Why Separate Terraform Workspaces for Services?
+
+Services are deployed in independent Terraform workspaces for operational flexibility:
+
+**Infrastructure Workspace (`terraform/infrastructure/`):**
+- Core networking (VPC, subnets, NAT, endpoints)
+- ECS cluster and Auto Scaling Group
+- Shared resources (ALB, SQS, S3, ECR)
+- Changes infrequently, requires careful planning
+
+**Service Workspaces (`terraform/service1/`, `terraform/service2/`):**
+- Only ECS task definitions and services
+- Fast deployment cycles (< 2 minutes)
+- Independent versioning and deployment
+- Minimal blast radius for changes
+
+**Monitoring Workspace (`terraform/monitoring/`):**
+- Grafana service and configuration
+- Separate from core infrastructure
+- Can update dashboards without touching infrastructure
+
+**Benefits:**
+- **Faster deployments** - Only update what changed, not entire infrastructure
+- **Reduced risk** - Service updates don't risk networking or cluster changes
+- **Independent lifecycles** - Update service1 without affecting service2
+- **Smaller state files** - Faster Terraform operations, less lock contention
+- **Team autonomy** - Different teams can manage different workspaces
+- **Easier rollback** - Revert single service without infrastructure changes
+- **Better CI/CD** - Separate pipelines for infrastructure vs applications
+
+**Workspace Dependencies:**
+Services read infrastructure outputs via remote state:
+```hcl
+data "terraform_remote_state" "infrastructure" {
+  backend = "s3"
+  config = {
+    bucket = "terraform-state"
+    key    = "infrastructure/terraform.tfstate"
+  }
+}
+```
 
 ### Why Repository Dispatch?
 
@@ -1026,7 +1091,7 @@ task --list                 # Show all available tasks
 - **Decoupled** - CI and CD pipelines are independent
 - **Payload flexibility** - Rich metadata passing
 - **Cross-repository** - Can trigger workflows in other repos
-
+ 
 ### CI/CD Design Decisions
 
 1. **Path-based change detection** - Only build/deploy changed services
@@ -1034,6 +1099,7 @@ task --list                 # Show all available tasks
 3. **Repository dispatch over workflow_dispatch** - More flexible for automation
 4. **Separate CI/CD pipelines** - Independent testing and deployment
 5. **Terraform for deployment** - Infrastructure as Code consistency
+6. **Separate service workspaces** - Fast, low-risk application deployments
 
 ## Future Enhancements
 
@@ -1054,9 +1120,10 @@ Items that would improve this solution:
 - **CI/CD pipeline monitoring** - Build success rates, deployment frequency, lead time for changes, MTTR
 
 ### Application
+- **Long polling for SQS** - Increase `WaitTimeSeconds` to 20 seconds in current implementation to reduce empty receives and API costs (currently using short polling with 10-second sleep intervals)
 - **Event-driven Service2 (Option 1: Lambda)** - Replace with Lambda function using SQS event source mapping (auto-scales, auto-deletes, built-in retry/DLQ)
-- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe is triggered by mesage entering the SQS queue and and target is an an Service2 ECS task with message as input via containerOverrides environment variables or it reads message from the queue 
-- **Event-driven Service2 (Option 3: EventBridge Pipes + ECS RunTask)** - Expose a API endpoint for Service2 via VPC latice  refactor the source code to run a app that has an API webnook insteaed of the polling loop; EventBridge Pipe is triggeed by a message entering the SQS queue and the target is an API destination of the VPC lattice service with with a resoucee gateway depeloyed into the vpc to give the Eventbridge pipe access to it. The pipe sends a webhook to read messages from the queue 
+- **Event-driven Service2 (Option 2: EventBridge Pipes + ECS RunTask)** - Remove Service2 ECS service and polling loop; EventBridge Pipe is triggered by mesage entering the SQS queue and and target is an an Service2 ECS task with message as input via containerOverrides environment variables for the service to process and delete from the queue
+- **Event-driven Service2 (Option 3: EventBridge Pipes + VPC Lattice)** - Expose a API endpoint for Service2 via VPC Lattice; refactor the source code to run an app that has an API webhook instead of the polling loop; EventBridge Pipe is triggered by a message entering the SQS queue and the target is an API destination of the VPC Lattice service with a resource gateway deployed into the VPC to give the EventBridge Pipe access to it. The pipe sends a webhook with the message as the payload for the service to process and delete from the queue
 - **DLQ with redrive** - Dead Letter Queue for failed messages with redrive policy to move messages back to source queue after fixing issues
 - **SQS batch actions** - Use ReceiveMessageBatch, DeleteMessageBatch, and ChangeMessageVisibilityBatch for better throughput in current polling implementation
 - **Visibility timeout tuning** - Adjust message visibility timeout based on processing time to prevent duplicate processing
